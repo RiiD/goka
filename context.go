@@ -124,7 +124,7 @@ func (ctx *cbContext) Emit(topic Stream, key interface{}, value interface{}) {
 	var err error
 	keyBytes, err := keyCodec.Encode(key)
 	if err != nil {
-		ctx.Fail(fmt.Errorf("error encoding message for topic %s: %v", topic, err))
+		ctx.Fail(fmt.Errorf("error encoding message key for topic %s: %v", topic, err))
 	}
 
 	var data []byte
