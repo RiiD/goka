@@ -35,11 +35,11 @@ var (
 
 // EmitHandler abstracts a function that allows to overwrite kafkamock's Emit function to
 // simulate producer errors
-type EmitHandler func(topic string, key string, value []byte) *kafka.Promise
+type EmitHandler func(topic string, key []byte, value []byte) *kafka.Promise
 
 type queuedMessage struct {
 	topic string
-	key   string
+	key   []byte
 	value []byte
 }
 
@@ -52,13 +52,16 @@ type Tester struct {
 	emitHandler  EmitHandler
 	storages     map[string]storage.Storage
 
-	codecs      map[string]goka.Codec
+	valueCodecs map[string]goka.Codec
+	keyCodecs   map[string]goka.Codec
 	topicQueues map[string]*queue
 	mQueues     sync.RWMutex
 	mStorages   sync.RWMutex
 
 	queuedMessages []*queuedMessage
 }
+
+var _ goka.Tester = &Tester{}
 
 func (km *Tester) queueForTopic(topic string) *queue {
 	km.mQueues.RLock()
@@ -118,7 +121,8 @@ func New(t T) *Tester {
 
 	tester := &Tester{
 		t:           t,
-		codecs:      make(map[string]goka.Codec),
+		valueCodecs: make(map[string]goka.Codec),
+		keyCodecs:   make(map[string]goka.Codec),
 		topicQueues: make(map[string]*queue),
 		storages:    make(map[string]storage.Storage),
 	}
@@ -127,19 +131,36 @@ func New(t T) *Tester {
 	return tester
 }
 
-func (km *Tester) registerCodec(topic string, codec goka.Codec) {
-	if existingCodec, exists := km.codecs[topic]; exists {
+func (km *Tester) registerValueCodec(topic string, codec goka.Codec) {
+	if existingCodec, exists := km.valueCodecs[topic]; exists {
 		if reflect.TypeOf(codec) != reflect.TypeOf(existingCodec) {
 			panic(fmt.Errorf("There are different codecs for the same topic. This is messed up (%#v, %#v)", codec, existingCodec))
 		}
 	}
-	km.codecs[topic] = codec
+	km.valueCodecs[topic] = codec
 }
 
-func (km *Tester) codecForTopic(topic string) goka.Codec {
-	codec, exists := km.codecs[topic]
+func (km *Tester) registerKeyCodec(topic string, codec goka.Codec) {
+	if existingCodec, exists := km.keyCodecs[topic]; exists {
+		if reflect.TypeOf(codec) != reflect.TypeOf(existingCodec) {
+			panic(fmt.Errorf("There are different codecs for the same topic. This is messed up (%#v, %#v)", codec, existingCodec))
+		}
+	}
+	km.keyCodecs[topic] = codec
+}
+
+func (km *Tester) valueCodecForTopic(topic string) goka.Codec {
+	codec, exists := km.valueCodecs[topic]
 	if !exists {
-		panic(fmt.Errorf("No codec for topic %s registered.", topic))
+		panic(fmt.Errorf("No value codec for topic %s registered.", topic))
+	}
+	return codec
+}
+
+func (km *Tester) keyCodecForTopic(topic string) goka.Codec {
+	codec, exists := km.keyCodecs[topic]
+	if !exists {
+		panic(fmt.Errorf("No key codec for topic %s registered.", topic))
 	}
 	return codec
 }
@@ -150,44 +171,52 @@ func (km *Tester) codecForTopic(topic string) goka.Codec {
 func (km *Tester) RegisterGroupGraph(gg *goka.GroupGraph) {
 	if gg.GroupTable() != nil {
 		km.getOrCreateQueue(gg.GroupTable().Topic()).expectSimpleConsumer()
-		km.registerCodec(gg.GroupTable().Topic(), gg.GroupTable().ValueCodec())
+		km.registerValueCodec(gg.GroupTable().Topic(), gg.GroupTable().ValueCodec())
+		km.registerKeyCodec(gg.GroupTable().Topic(), gg.GroupTable().KeyCodec())
 	}
 
 	for _, input := range gg.InputStreams() {
 		km.getOrCreateQueue(input.Topic()).expectGroupConsumer()
-		km.registerCodec(input.Topic(), input.ValueCodec())
+		km.registerValueCodec(input.Topic(), input.ValueCodec())
+		km.registerKeyCodec(input.Topic(), input.KeyCodec())
 	}
 
 	for _, output := range gg.OutputStreams() {
-		km.registerCodec(output.Topic(), output.ValueCodec())
+		km.registerValueCodec(output.Topic(), output.ValueCodec())
+		km.registerKeyCodec(output.Topic(), output.KeyCodec())
 		km.getOrCreateQueue(output.Topic())
 	}
 	for _, join := range gg.JointTables() {
 		km.getOrCreateQueue(join.Topic()).expectSimpleConsumer()
-		km.registerCodec(join.Topic(), join.ValueCodec())
+		km.registerValueCodec(join.Topic(), join.ValueCodec())
+		km.registerKeyCodec(join.Topic(), join.KeyCodec())
 	}
 
 	if loop := gg.LoopStream(); loop != nil {
 		km.getOrCreateQueue(loop.Topic()).expectGroupConsumer()
-		km.registerCodec(loop.Topic(), loop.ValueCodec())
+		km.registerValueCodec(loop.Topic(), loop.ValueCodec())
+		km.registerKeyCodec(loop.Topic(), loop.KeyCodec())
 	}
 
 	for _, lookup := range gg.LookupTables() {
 		km.getOrCreateQueue(lookup.Topic()).expectSimpleConsumer()
-		km.registerCodec(lookup.Topic(), lookup.ValueCodec())
+		km.registerValueCodec(lookup.Topic(), lookup.ValueCodec())
+		km.registerKeyCodec(lookup.Topic(), lookup.KeyCodec())
 	}
 
 }
 
 // RegisterView registers a view to be working with the tester.
-func (km *Tester) RegisterView(table goka.Table, c goka.Codec) {
+func (km *Tester) RegisterView(table goka.Table, keyCodec, valueCodec goka.Codec) {
 	km.getOrCreateQueue(string(table)).expectSimpleConsumer()
-	km.registerCodec(string(table), c)
+	km.registerValueCodec(string(table), keyCodec)
+	km.registerKeyCodec(string(table), valueCodec)
 }
 
 // RegisterEmitter registers an emitter to be working with the tester.
-func (km *Tester) RegisterEmitter(topic goka.Stream, codec goka.Codec) {
-	km.registerCodec(string(topic), codec)
+func (km *Tester) RegisterEmitter(topic goka.Stream, keyCodec, valueCodec goka.Codec) {
+	km.registerValueCodec(string(topic), valueCodec)
+	km.registerKeyCodec(string(topic), keyCodec)
 	km.getOrCreateQueue(string(topic))
 }
 
@@ -285,91 +314,97 @@ func (km *Tester) waitStartup() {
 }
 
 // Consume a message using the topic's configured codec
-func (km *Tester) Consume(topic string, key string, msg interface{}) {
+func (km *Tester) Consume(topic string, key interface{}, msg interface{}) {
 	km.waitStartup()
+
+	keyBytes := km.encodeKeyForTopic(topic, key)
 
 	// if the user wants to send a nil for some reason,
 	// just let her. Goka should handle it accordingly :)
 	value := reflect.ValueOf(msg)
 	if msg == nil || (value.Kind() == reflect.Ptr && value.IsNil()) {
-		km.pushMessage(topic, key, nil)
+		km.pushMessage(topic, keyBytes, nil)
 	} else {
-		data, err := km.codecForTopic(topic).Encode(msg)
+		data, err := km.valueCodecForTopic(topic).Encode(msg)
 		if err != nil {
 			panic(fmt.Errorf("Error encoding value %v: %v", msg, err))
 		}
-		km.pushMessage(topic, key, data)
+		km.pushMessage(topic, keyBytes, data)
 	}
 
 	km.waitForConsumers()
 }
 
 // ConsumeData pushes a marshalled byte slice to a topic and a key
-func (km *Tester) ConsumeData(topic string, key string, data []byte) {
+func (km *Tester) ConsumeData(topic string, key []byte, data []byte) {
 	km.waitStartup()
 	km.pushMessage(topic, key, data)
 	km.waitForConsumers()
 }
 
-func (km *Tester) pushMessage(topic string, key string, data []byte) {
+func (km *Tester) pushMessage(topic string, key []byte, data []byte) {
 	km.queuedMessages = append(km.queuedMessages, &queuedMessage{topic: topic, key: key, value: data})
 }
 
 // handleEmit handles an Emit-call on the producerMock.
 // This takes care of queueing calls
 // to handled topics or putting the emitted messages in the emitted-messages-list
-func (km *Tester) handleEmit(topic string, key string, value []byte) *kafka.Promise {
+func (km *Tester) handleEmit(topic string, key []byte, value []byte) *kafka.Promise {
 	promise := kafka.NewPromise()
 	km.pushMessage(topic, key, value)
 	return promise.Finish(nil)
 }
 
 // TableValue attempts to get a value from any table that is used in the kafka mock.
-func (km *Tester) TableValue(table goka.Table, key string) interface{} {
+func (km *Tester) TableValue(table goka.Table, key interface{}) interface{} {
 	km.waitStartup()
 
 	topic := string(table)
+	keyBytes := km.encodeKeyForTopic(topic, key)
+
 	km.mStorages.RLock()
 	st, exists := km.storages[topic]
 	km.mStorages.RUnlock()
 	if !exists {
 		panic(fmt.Errorf("topic %s does not exist", topic))
 	}
-	item, err := st.Get(key)
+	item, err := st.Get(keyBytes)
 	if err != nil {
-		km.t.Fatalf("Error getting table value from storage (table=%s, key=%s): %v", table, key, err)
+		km.t.Fatalf("Error getting table value from storage (table=%s, key=%v): %v", table, key, err)
 	}
 	if item == nil {
 		return nil
 	}
-	value, err := km.codecForTopic(topic).Decode(item)
+	value, err := km.valueCodecForTopic(topic).Decode(item)
 	if err != nil {
-		km.t.Fatalf("error decoding value from storage (table=%s, key=%s, value=%v): %v", table, key, item, err)
+		km.t.Fatalf("error decoding value from storage (table=%s, key=%v, value=%v): %v", table, key, item, err)
 	}
 	return value
 }
 
 // SetTableValue sets a value in a processor's or view's table direcly via storage
-func (km *Tester) SetTableValue(table goka.Table, key string, value interface{}) {
+func (km *Tester) SetTableValue(table goka.Table, key interface{}, value interface{}) {
 	km.waitStartup()
 
 	logger.Printf("setting value is not implemented yet.")
 
 	topic := string(table)
+	keyBytes := km.encodeKeyForTopic(topic, key)
+
 	km.mStorages.RLock()
 	st, exists := km.storages[topic]
 	km.mStorages.RUnlock()
 	if !exists {
 		panic(fmt.Errorf("storage for topic %s does not exist", topic))
 	}
-	data, err := km.codecForTopic(topic).Encode(value)
+	data, err := km.valueCodecForTopic(topic).Encode(value)
 	if err != nil {
-		km.t.Fatalf("error decoding value from storage (table=%s, key=%s, value=%v): %v", table, key, value, err)
+		km.t.Fatalf("error decoding value from storage (table=%s, key=%v, value=%v): %v", table, key, value, err)
 	}
 
-	err = st.Set(key, data)
+	err = st.Set(keyBytes, data)
 	if err != nil {
-		panic(fmt.Errorf("Error setting key %s in storage %s: %v", key, table, err))
+		panic(fmt.Errorf("Error setting key %v in storage %s: %v", key, table, err))
 	}
 }
 
@@ -385,10 +420,19 @@ func (km *Tester) ClearValues() {
 		logger.Printf("clearing all values from storage for topic %s", topic)
 		it, _ := st.Iterator()
 		for it.Next() {
-			st.Delete(string(it.Key()))
+			st.Delete(it.Key())
 		}
 	}
 	km.mStorages.Unlock()
+}
+
+func (km *Tester) encodeKeyForTopic(topic string, key interface{}) []byte {
+	keyBytes, err := km.keyCodecForTopic(topic).Encode(key)
+	if err != nil {
+		km.t.Fatalf("Error encoding key (topic=%s, key=%v): %v", topic, key, err)
+	}
+
+	return keyBytes
 }
 
 type topicMgrMock struct {
@@ -432,6 +476,8 @@ type producerMock struct {
 	emitter EmitHandler
 }
 
+var _ kafka.Producer = &producerMock{}
+
 func newProducerMock(emitter EmitHandler) *producerMock {
 	return &producerMock{
 		emitter: emitter,
@@ -441,7 +487,7 @@ func newProducerMock(emitter EmitHandler) *producerMock {
 // Emit emits messages to arbitrary topics.
 // The mock simply forwards the emit to the KafkaMock which takes care of queueing calls
 // to handled topics or putting the emitted messages in the emitted-messages-list
-func (p *producerMock) Emit(topic string, key string, value []byte) *kafka.Promise {
+func (p *producerMock) Emit(topic string, key []byte, value []byte) *kafka.Promise {
 	return p.emitter(topic, key, value)
 }
 
@@ -459,8 +505,10 @@ type flushingProducer struct {
 	producer kafka.Producer
 }
 
+var _ kafka.Producer = &flushingProducer{}
+
 // Emit using the underlying producer
-func (e *flushingProducer) Emit(topic string, key string, value []byte) *kafka.Promise {
+func (e *flushingProducer) Emit(topic string, key []byte, value []byte) *kafka.Promise {
 	prom := e.producer.Emit(topic, key, value)
 	e.tester.waitForConsumers()
 	return prom

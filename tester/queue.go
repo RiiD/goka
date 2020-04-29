@@ -8,7 +8,7 @@ import (
 
 type message struct {
 	offset int64
-	key    string
+	key    []byte
 	value  []byte
 }
 
@@ -120,7 +120,7 @@ func (q *queue) waitForConsumers() int {
 	return numMessagesConsumed
 }
 
-func (q *queue) push(key string, value []byte) {
+func (q *queue) push(key []byte, value []byte) {
 	q.Lock()
 	defer q.Unlock()
 	q.messages = append(q.messages, &message{

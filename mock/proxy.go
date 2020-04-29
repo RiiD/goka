@@ -9,30 +9,30 @@ import (
 	reflect "reflect"
 )
 
-// MockkafkaProxy is a mock of kafkaProxy interface
+// MockkafkaProxy is a mock of kafkaProxy interface.
 type MockkafkaProxy struct {
 	ctrl     *gomock.Controller
 	recorder *MockkafkaProxyMockRecorder
 }
 
-// MockkafkaProxyMockRecorder is the mock recorder for MockkafkaProxy
+// MockkafkaProxyMockRecorder is the mock recorder for MockkafkaProxy.
 type MockkafkaProxyMockRecorder struct {
 	mock *MockkafkaProxy
 }
 
-// NewMockkafkaProxy creates a new mock instance
+// NewMockkafkaProxy creates a new mock instance.
 func NewMockkafkaProxy(ctrl *gomock.Controller) *MockkafkaProxy {
 	mock := &MockkafkaProxy{ctrl: ctrl}
 	mock.recorder = &MockkafkaProxyMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockkafkaProxy) EXPECT() *MockkafkaProxyMockRecorder {
 	return m.recorder
 }
 
-// Add mocks base method
+// Add mocks base method.
 func (m *MockkafkaProxy) Add(arg0 string, arg1 int64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Add", arg0, arg1)
@@ -40,13 +40,13 @@ func (m *MockkafkaProxy) Add(arg0 string, arg1 int64) error {
 	return ret0
 }
 
-// Add indicates an expected call of Add
+// Add indicates an expected call of Add.
 func (mr *MockkafkaProxyMockRecorder) Add(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockkafkaProxy)(nil).Add), arg0, arg1)
 }
 
-// Remove mocks base method
+// Remove mocks base method.
 func (m *MockkafkaProxy) Remove(arg0 string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Remove", arg0)
@@ -54,31 +54,31 @@ func (m *MockkafkaProxy) Remove(arg0 string) error {
 	return ret0
 }
 
-// Remove indicates an expected call of Remove
+// Remove indicates an expected call of Remove.
 func (mr *MockkafkaProxyMockRecorder) Remove(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockkafkaProxy)(nil).Remove), arg0)
 }
 
-// AddGroup mocks base method
+// AddGroup mocks base method.
 func (m *MockkafkaProxy) AddGroup() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddGroup")
 }
 
-// AddGroup indicates an expected call of AddGroup
+// AddGroup indicates an expected call of AddGroup.
 func (mr *MockkafkaProxyMockRecorder) AddGroup() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddGroup", reflect.TypeOf((*MockkafkaProxy)(nil).AddGroup))
 }
 
-// Stop mocks base method
+// Stop mocks base method.
 func (m *MockkafkaProxy) Stop() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Stop")
 }
 
-// Stop indicates an expected call of Stop
+// Stop indicates an expected call of Stop.
 func (mr *MockkafkaProxyMockRecorder) Stop() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockkafkaProxy)(nil).Stop))

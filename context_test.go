@@ -19,7 +19,7 @@ import (
 )
 
 func newEmitter(err error, done func(err error)) emitter {
-	return func(topic string, key string, value []byte) *kafka.Promise {
+	return func(topic string, key []byte, value []byte) *kafka.Promise {
 		p := kafka.NewPromise()
 		if done != nil {
 			p.Then(done)
@@ -29,7 +29,7 @@ func newEmitter(err error, done func(err error)) emitter {
 }
 
 func newEmitterW(wg *sync.WaitGroup, err error, done func(err error)) emitter {
-	return func(topic string, key string, value []byte) *kafka.Promise {
+	return func(topic string, key []byte, value []byte) *kafka.Promise {
 		wg.Add(1)
 		p := kafka.NewPromise()
 		if done != nil {
@@ -57,7 +57,7 @@ func TestContext_Emit(t *testing.T) {
 	})
 
 	ctx.start()
-	ctx.emit("emit-topic", "key", []byte("value"))
+	ctx.emit("emit-topic", []byte("key"), []byte("value"))
 	ctx.finish(nil)
 
 	// we can now for all callbacks -- it should also guarantee a memory fence
@@ -103,7 +103,7 @@ func TestContext_EmitError(t *testing.T) {
 	})
 
 	ctx.start()
-	ctx.emit("emit-topic", "key", []byte("value"))
+	ctx.emit("emit-topic", []byte("key"), []byte("value"))
 	ctx.finish(nil)
 
 	// we can now for all callbacks -- it should also guarantee a memory fence
@@ -165,7 +165,7 @@ func TestContext_Delete(t *testing.T) {
 
 	offset := int64(123)
 	ack := 0
-	key := "key"
+	key := []byte("key")
 
 	ctx := &cbContext{
 		graph:   DefineGroup(group, Persist(new(codec.String))),
@@ -199,7 +199,7 @@ func TestContext_DeleteStateless(t *testing.T) {
 	defer ctrl.Finish()
 
 	offset := int64(123)
-	key := "key"
+	key := []byte("key")
 
 	ctx := &cbContext{
 		graph: DefineGroup(group),
@@ -218,7 +218,7 @@ func TestContext_DeleteStorageError(t *testing.T) {
 	storage := mock.NewMockStorage(ctrl)
 
 	offset := int64(123)
-	key := "key"
+	key := []byte("key")
 
 	ctx := &cbContext{
 		graph:   DefineGroup(group, Persist(new(codec.String))),
@@ -243,7 +243,7 @@ func TestContext_Set(t *testing.T) {
 
 	offset := int64(123)
 	ack := 0
-	key := "key"
+	key := []byte("key")
 	value := "value"
 
 	ctx := &cbContext{
@@ -281,7 +281,7 @@ func TestContext_GetSetStateful(t *testing.T) {
 
 	var (
 		storage = mock.NewMockStorage(ctrl)
-		key     = "key"
+		key     = []byte("key")
 		value   = "value"
 		offset  = int64(123)
 		wg      = new(sync.WaitGroup)
@@ -293,10 +293,10 @@ func TestContext_GetSetStateful(t *testing.T) {
 		graph:   graph,
 		msg:     &message{Key: key, Offset: offset},
 		storage: storage,
-		emitter: func(tp string, k string, v []byte) *kafka.Promise {
+		emitter: func(tp string, k []byte, v []byte) *kafka.Promise {
 			wg.Add(1)
 			ensure.DeepEqual(t, tp, graph.GroupTable().Topic())
-			ensure.DeepEqual(t, string(k), key)
+			ensure.DeepEqual(t, k, key)
 			ensure.DeepEqual(t, string(v), value)
 			return kafka.NewPromise().Finish(nil)
 		},
@@ -320,7 +320,7 @@ func TestContext_SetErrors(t *testing.T) {
 
 	var (
 		storage       = mock.NewMockStorage(ctrl)
-		key           = "key"
+		key           = []byte("key")
 		value         = "value"
 		offset  int64 = 123
 		wg            = new(sync.WaitGroup)
@@ -385,7 +385,7 @@ func TestContext_Loopback(t *testing.T) {
 		graph:  graph,
 		msg:    new(message),
 		pstats: newPartitionStats(),
-		emitter: func(tp string, k string, v []byte) *kafka.Promise {
+		emitter: func(tp string, k []byte, v []byte) *kafka.Promise {
 			cnt++
 			ensure.DeepEqual(t, tp, graph.LoopStream().Topic())
 			ensure.DeepEqual(t, string(k), key)
@@ -403,7 +403,7 @@ func TestContext_Join(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
-		key         = "key"
+		key         = []byte("key")
 		value       = "value"
 		table Table = "table"
 		st          = mock.NewMockStorage(ctrl)
@@ -457,12 +457,13 @@ func TestContext_Lookup(t *testing.T) {
 
 	ctx := &cbContext{
 		graph: DefineGroup("group", Persist(c), Loop(c, cb)),
-		msg:   &message{Key: key},
+		msg:   &message{Key: []byte(key)},
 		views: map[string]*View{
 			string(table): &View{
 				opts: &voptions{
-					tableCodec: c,
-					hasher:     DefaultHasher(),
+					tableValueCodec: c,
+					tableKeyCodec:   c,
+					hasher:          DefaultHasher(),
 				},
 				partitions: []*partition{
 					&partition{
@@ -475,13 +476,13 @@ func TestContext_Lookup(t *testing.T) {
 		},
 	}
 
-	st.EXPECT().Get(key).Return([]byte(value), nil)
+	st.EXPECT().Get([]byte(key)).Return([]byte(value), nil)
 	v := ctx.Lookup(table, key)
 	ensure.DeepEqual(t, v, value)
 
 	func() {
 		defer PanicStringContains(t, errSome.Error())
-		st.EXPECT().Get(key).Return(nil, errSome)
+		st.EXPECT().Get([]byte(key)).Return(nil, errSome)
 		_ = ctx.Lookup(table, key)
 	}()
 

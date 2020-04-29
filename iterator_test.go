@@ -27,7 +27,7 @@ func TestIterator(t *testing.T) {
 	}
 
 	for k, v := range kv {
-		ensure.Nil(t, st.Set(k, []byte(v)))
+		ensure.Nil(t, st.Set([]byte(k), []byte(v)))
 	}
 
 	ensure.Nil(t, st.SetOffset(777))
@@ -36,8 +36,9 @@ func TestIterator(t *testing.T) {
 	ensure.Nil(t, err)
 
 	it := &iterator{
-		iter:  storage.NewMultiIterator([]storage.Iterator{iter}),
-		codec: new(codec.String),
+		iter:       storage.NewMultiIterator([]storage.Iterator{iter}),
+		valueCodec: new(codec.String),
+		keyCodec:   new(codec.String),
 	}
 	defer it.Release()
 	count := 0
@@ -49,8 +50,11 @@ func TestIterator(t *testing.T) {
 
 	for it.Next() {
 		count++
-		key := it.Key()
-		expected, ok := kv[key]
+		key, err := it.Key()
+		ensure.Nil(t, err)
+		keyString, ok := key.(string)
+		ensure.True(t, ok)
+		expected, ok := kv[keyString]
 		if !ok {
 			t.Fatalf("unexpected key from iterator: %s", key)
 		}

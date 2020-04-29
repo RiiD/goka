@@ -13,7 +13,7 @@ import (
 
 // UpdateCallback is invoked upon arrival of a message for a table partition.
 // The partition storage shall be updated in the callback.
-type UpdateCallback func(s storage.Storage, partition int32, key string, value []byte) error
+type UpdateCallback func(s storage.Storage, partition int32, key []byte, value []byte) error
 
 // RebalanceCallback is invoked when the processor receives a new partition assignment.
 type RebalanceCallback func(a kafka.Assignment)
@@ -43,7 +43,7 @@ func DefaultViewStoragePath() string {
 // during recovery of processors and during the normal operation of views.
 // DefaultUpdate can be used in the function passed to WithUpdateCallback and
 // WithViewCallback.
-func DefaultUpdate(s storage.Storage, partition int32, key string, value []byte) error {
+func DefaultUpdate(s storage.Storage, partition int32, key []byte, value []byte) error {
 	if value == nil {
 		return s.Delete(key)
 	}
@@ -192,8 +192,8 @@ type Tester interface {
 	EmitterProducerBuilder() kafka.ProducerBuilder
 	TopicManagerBuilder() kafka.TopicManagerBuilder
 	RegisterGroupGraph(*GroupGraph)
-	RegisterEmitter(Stream, Codec)
-	RegisterView(Table, Codec)
+	RegisterEmitter(Stream, Codec, Codec)
+	RegisterView(Table, Codec, Codec)
 }
 
 // WithTester configures all external connections of a processor, ie, storage,
@@ -248,12 +248,13 @@ func WithRebalanceCallback(cb RebalanceCallback) ProcessorOption {
 ///////////////////////////////////////////////////////////////////////////////
 
 // ViewOption defines a configuration option to be used when creating a view.
-type ViewOption func(*voptions, Table, Codec)
+type ViewOption func(*voptions, Table, Codec, Codec)
 
 type voptions struct {
 	log                  logger.Logger
 	clientID             string
-	tableCodec           Codec
+	tableValueCodec      Codec
+	tableKeyCodec        Codec
 	updateCallback       UpdateCallback
 	partitionChannelSize int
 	hasher               func() hash.Hash32
@@ -269,7 +270,7 @@ type voptions struct {
 // WithViewLogger sets the logger the view should use. By default, views
 // use the standard library logger.
 func WithViewLogger(log logger.Logger) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.log = log
 	}
 }
@@ -277,28 +278,28 @@ func WithViewLogger(log logger.Logger) ViewOption {
 // WithViewCallback defines the callback called upon recovering a message
 // from the log.
 func WithViewCallback(cb UpdateCallback) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.updateCallback = cb
 	}
 }
 
 // WithViewStorageBuilder defines a builder for the storage of each partition.
 func WithViewStorageBuilder(sb storage.Builder) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.builders.storage = sb
 	}
 }
 
 // WithViewConsumerBuilder replaces default view consumer.
 func WithViewConsumerBuilder(cb kafka.ConsumerBuilder) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.builders.consumer = cb
 	}
 }
 
 // WithViewTopicManagerBuilder replaces the default topic manager.
 func WithViewTopicManagerBuilder(tmb kafka.TopicManagerBuilder) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.builders.topicmgr = tmb
 	}
 }
@@ -307,21 +308,21 @@ func WithViewTopicManagerBuilder(tmb kafka.TopicManagerBuilder) ViewOption {
 // This is mostly used for testing by setting it to 0 to have synchronous behavior
 // of goka.
 func WithViewPartitionChannelSize(size int) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.partitionChannelSize = size
 	}
 }
 
 // WithViewHasher sets the hash function that assigns keys to partitions.
 func WithViewHasher(hasher func() hash.Hash32) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.hasher = hasher
 	}
 }
 
 // WithViewClientID defines the client ID used to identify with Kafka.
 func WithViewClientID(clientID string) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.clientID = clientID
 	}
 }
@@ -330,7 +331,7 @@ func WithViewClientID(clientID string) ViewOption {
 // returns errors. If the view is restartable, the client must call Terminate()
 // to release all resources, ie, close the local storage.
 func WithViewRestartable() ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.restartable = true
 	}
 }
@@ -338,22 +339,22 @@ func WithViewRestartable() ViewOption {
 // WithViewTester configures all external connections of a processor, ie, storage,
 // consumer and producer
 func WithViewTester(t Tester) ViewOption {
-	return func(o *voptions, table Table, codec Codec) {
+	return func(o *voptions, table Table, keyCodec, valueCodec Codec) {
 		o.builders.storage = t.StorageBuilder()
 		o.builders.consumer = t.ConsumerBuilder()
 		o.builders.topicmgr = t.TopicManagerBuilder()
 		o.partitionChannelSize = 0
-		t.RegisterView(table, codec)
+		t.RegisterView(table, valueCodec, keyCodec)
 	}
 }
 
-func (opt *voptions) applyOptions(topic Table, codec Codec, opts ...ViewOption) error {
+func (opt *voptions) applyOptions(topic Table, keyCodec, valueCodec Codec, opts ...ViewOption) error {
 	opt.clientID = defaultClientID
 	opt.log = logger.Default()
 	opt.hasher = DefaultHasher()
 
 	for _, o := range opts {
-		o(opt, topic, codec)
+		o(opt, topic, keyCodec, valueCodec)
 	}
 
 	// StorageBuilder should always be set as a default option in NewView
@@ -376,7 +377,7 @@ func (opt *voptions) applyOptions(topic Table, codec Codec, opts ...ViewOption) 
 
 // EmitterOption defines a configuration option to be used when creating an
 // emitter.
-type EmitterOption func(*eoptions, Stream, Codec)
+type EmitterOption func(*eoptions, Stream, Codec, Codec)
 
 // emitter options
 type eoptions struct {
@@ -394,53 +395,53 @@ type eoptions struct {
 // WithEmitterLogger sets the logger the emitter should use. By default,
 // emitters use the standard library logger.
 func WithEmitterLogger(log logger.Logger) EmitterOption {
-	return func(o *eoptions, topic Stream, codec Codec) {
+	return func(o *eoptions, topic Stream, keyCodec, valueCodec Codec) {
 		o.log = log
 	}
 }
 
 // WithEmitterClientID defines the client ID used to identify with kafka.
 func WithEmitterClientID(clientID string) EmitterOption {
-	return func(o *eoptions, topic Stream, codec Codec) {
+	return func(o *eoptions, topic Stream, keyCodec, valueCodec Codec) {
 		o.clientID = clientID
 	}
 }
 
 // WithEmitterTopicManagerBuilder replaces the default topic manager builder.
 func WithEmitterTopicManagerBuilder(tmb kafka.TopicManagerBuilder) EmitterOption {
-	return func(o *eoptions, topic Stream, codec Codec) {
+	return func(o *eoptions, topic Stream, keyCodec, valueCodec Codec) {
 		o.builders.topicmgr = tmb
 	}
 }
 
 // WithEmitterProducerBuilder replaces the default producer builder.
 func WithEmitterProducerBuilder(pb kafka.ProducerBuilder) EmitterOption {
-	return func(o *eoptions, topic Stream, codec Codec) {
+	return func(o *eoptions, topic Stream, keyCodec, valueCodec Codec) {
 		o.builders.producer = pb
 	}
 }
 
 // WithEmitterHasher sets the hash function that assigns keys to partitions.
 func WithEmitterHasher(hasher func() hash.Hash32) EmitterOption {
-	return func(o *eoptions, topic Stream, codec Codec) {
+	return func(o *eoptions, topic Stream, keyCodec, valueCodec Codec) {
 		o.hasher = hasher
 	}
 }
 
 func WithEmitterTester(t Tester) EmitterOption {
-	return func(o *eoptions, topic Stream, codec Codec) {
+	return func(o *eoptions, topic Stream, keyCodec, valueCodec Codec) {
 		o.builders.producer = t.EmitterProducerBuilder()
 		o.builders.topicmgr = t.TopicManagerBuilder()
-		t.RegisterEmitter(topic, codec)
+		t.RegisterEmitter(topic, keyCodec, valueCodec)
 	}
 }
-func (opt *eoptions) applyOptions(topic Stream, codec Codec, opts ...EmitterOption) error {
+func (opt *eoptions) applyOptions(topic Stream, keyCodec, valueCodec Codec, opts ...EmitterOption) error {
 	opt.clientID = defaultClientID
 	opt.log = logger.Default()
 	opt.hasher = DefaultHasher()
 
 	for _, o := range opts {
-		o(opt, topic, codec)
+		o(opt, topic, keyCodec, valueCodec)
 	}
 
 	// config not set, use default one

@@ -11,7 +11,7 @@ import (
 
 // Publisher defines an interface to Publish the event somewhere.
 type Publisher interface {
-	Publish(ctx context.Context, key string, event *Event) error
+	Publish(ctx context.Context, key interface{}, event *Event) error
 	Close() error
 }
 

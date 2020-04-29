@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lovoo/goka/codec"
 	"sync"
 
 	"github.com/lovoo/goka/kafka"
@@ -13,7 +14,7 @@ import (
 )
 
 // Getter functions return a value for a key or an error. If no value exists for the key, nil is returned without errors.
-type Getter func(string) (interface{}, error)
+type Getter func(interface{}) (interface{}, error)
 
 // View is a materialized (i.e. persistent) cache of a group table.
 type View struct {
@@ -26,7 +27,12 @@ type View struct {
 }
 
 // NewView creates a new View object from a group.
-func NewView(brokers []string, topic Table, codec Codec, options ...ViewOption) (*View, error) {
+func NewView(brokers []string, topic Table, valueCodec Codec, options ...ViewOption) (*View, error) {
+	return NewViewWithCustomKeyCodec(brokers, topic, new(codec.String), valueCodec, options...)
+}
+
+// NewView creates a new View object from a group.
+func NewViewWithCustomKeyCodec(brokers []string, topic Table, keyCodec, valueCodec Codec, options ...ViewOption) (*View, error) {
 	options = append(
 		// default options comes first
 		[]ViewOption{
@@ -42,12 +48,13 @@ func NewView(brokers []string, topic Table, codec Codec, options ...ViewOption) 
 
 	// figure out how many partitions the group has
 	opts := new(voptions)
-	err := opts.applyOptions(topic, codec, options...)
+	err := opts.applyOptions(topic, keyCodec, valueCodec, options...)
 	if err != nil {
 		return nil, fmt.Errorf("Error applying user-defined options: %v", err)
 	}
 
-	opts.tableCodec = codec
+	opts.tableValueCodec = valueCodec
+	opts.tableKeyCodec = keyCodec
 
 	v := &View{
 		brokers: brokers,
@@ -197,13 +204,13 @@ func (v *View) Terminate() error {
 	return nil
 }
 
-func (v *View) hash(key string) (int32, error) {
+func (v *View) hash(key []byte) (int32, error) {
 	// create a new hasher every time. Alternative would be to store the hash in
 	// view and every time reset the hasher (ie, hasher.Reset()). But that would
 	// also require us to protect the access of the hasher with a mutex.
 	hasher := v.opts.hasher()
 
-	_, err := hasher.Write([]byte(key))
+	_, err := hasher.Write(key)
 	if err != nil {
 		return -1, err
 	}
@@ -217,7 +224,7 @@ func (v *View) hash(key string) (int32, error) {
 	return hash % int32(len(v.partitions)), nil
 }
 
-func (v *View) find(key string) (storage.Storage, error) {
+func (v *View) find(key []byte) (storage.Storage, error) {
 	h, err := v.hash(key)
 	if err != nil {
 		return nil, err
@@ -233,15 +240,20 @@ func (v *View) Topic() string {
 // Get returns the value for the key in the view, if exists. Nil if it doesn't.
 // Get can be called by multiple goroutines concurrently.
 // Get can only be called after Recovered returns true.
-func (v *View) Get(key string) (interface{}, error) {
+func (v *View) Get(key interface{}) (interface{}, error) {
+	keyBytes, err := v.encodeKey(key)
+	if err != nil {
+		return nil, err
+	}
+
 	// find partition where key is located
-	s, err := v.find(key)
+	s, err := v.find(keyBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	// get key and return
-	data, err := s.Get(key)
+	data, err := s.Get(keyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error getting value (key %s): %v", key, err)
 	} else if data == nil {
@@ -249,7 +261,7 @@ func (v *View) Get(key string) (interface{}, error) {
 	}
 
 	// decode value
-	value, err := v.opts.tableCodec.Decode(data)
+	value, err := v.opts.tableValueCodec.Decode(data)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding value (key %s): %v", key, err)
 	}
@@ -259,14 +271,19 @@ func (v *View) Get(key string) (interface{}, error) {
 }
 
 // Has checks whether a value for passed key exists in the view.
-func (v *View) Has(key string) (bool, error) {
-	// find partition where key is located
-	s, err := v.find(key)
+func (v *View) Has(key interface{}) (bool, error) {
+	keyBytes, err := v.encodeKey(key)
 	if err != nil {
 		return false, err
 	}
 
-	return s.Has(key)
+	// find partition where key is located
+	s, err := v.find(keyBytes)
+	if err != nil {
+		return false, err
+	}
+
+	return s.Has(keyBytes)
 }
 
 // Iterator returns an iterator that iterates over the state of the View.
@@ -287,16 +304,27 @@ func (v *View) Iterator() (Iterator, error) {
 	}
 
 	return &iterator{
-		iter:  storage.NewMultiIterator(iters),
-		codec: v.opts.tableCodec,
+		iter:       storage.NewMultiIterator(iters),
+		valueCodec: v.opts.tableValueCodec,
+		keyCodec:   v.opts.tableKeyCodec,
 	}, nil
 }
 
 // IteratorWithRange returns an iterator that iterates over the state of the View. This iterator is build using the range.
-func (v *View) IteratorWithRange(start, limit string) (Iterator, error) {
+func (v *View) IteratorWithRange(start, limit interface{}) (Iterator, error) {
+	startBytes, err := v.encodeKey(start)
+	if err != nil {
+		return nil, err
+	}
+
+	limitBytes, err := v.encodeKey(limit)
+	if err != nil {
+		return nil, err
+	}
+
 	iters := make([]storage.Iterator, 0, len(v.partitions))
 	for i := range v.partitions {
-		iter, err := v.partitions[i].st.IteratorWithRange([]byte(start), []byte(limit))
+		iter, err := v.partitions[i].st.IteratorWithRange(startBytes, limitBytes)
 		if err != nil {
 			// release already opened iterators
 			for i := range iters {
@@ -310,20 +338,25 @@ func (v *View) IteratorWithRange(start, limit string) (Iterator, error) {
 	}
 
 	return &iterator{
-		iter:  storage.NewMultiIterator(iters),
-		codec: v.opts.tableCodec,
+		iter:       storage.NewMultiIterator(iters),
+		valueCodec: v.opts.tableValueCodec,
 	}, nil
 }
 
 // Evict removes the given key only from the local cache. In order to delete a
 // key from Kafka and other Views, context.Delete should be used on a Processor.
-func (v *View) Evict(key string) error {
-	s, err := v.find(key)
+func (v *View) Evict(key interface{}) error {
+	keyBytes, err := v.encodeKey(key)
 	if err != nil {
 		return err
 	}
 
-	return s.Delete(key)
+	s, err := v.find(keyBytes)
+	if err != nil {
+		return err
+	}
+
+	return s.Delete(keyBytes)
 }
 
 func (v *View) run(ctx context.Context) error {
@@ -405,4 +438,13 @@ func (v *View) statsWithContext(ctx context.Context) *ViewStats {
 	}
 	wg.Wait()
 	return stats
+}
+
+func (v *View) encodeKey(key interface{}) ([]byte, error) {
+	keyBytes, err := v.opts.tableKeyCodec.Encode(key)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding key (key %v): %v", key, err)
+	}
+
+	return keyBytes, nil
 }

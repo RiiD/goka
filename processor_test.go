@@ -265,7 +265,7 @@ func TestProcessor_process(t *testing.T) {
 	// emit something
 	promise := new(kafka.Promise)
 	gomock.InOrder(
-		producer.EXPECT().Emit("anothertopic", "key", []byte("message")).Return(promise),
+		producer.EXPECT().Emit("anothertopic", []byte("key"), []byte("message")).Return(promise),
 		consumer.EXPECT().Commit("sometopic", int32(1), int64(123)),
 	)
 	msg = &message{Topic: "sometopic", Partition: 1, Offset: 123, Data: []byte("something")}
@@ -280,13 +280,13 @@ func TestProcessor_process(t *testing.T) {
 	// store something
 	promise = new(kafka.Promise)
 	gomock.InOrder(
-		st.EXPECT().Set("key", []byte("message")),
-		producer.EXPECT().Emit(tableName(group), "key", []byte("message")).Return(promise),
+		st.EXPECT().Set([]byte("key"), []byte("message")),
+		producer.EXPECT().Emit(tableName(group), []byte("key"), []byte("message")).Return(promise),
 		st.EXPECT().GetOffset(int64(0)).Return(int64(321), nil),
 		st.EXPECT().SetOffset(int64(322)),
 		consumer.EXPECT().Commit("sometopic", int32(1), int64(123)),
 	)
-	msg = &message{Topic: "sometopic", Key: "key", Partition: 1, Offset: 123, Data: []byte("something")}
+	msg = &message{Topic: "sometopic", Key: []byte("key"), Partition: 1, Offset: 123, Data: []byte("something")}
 	p.graph.callbacks["sometopic"] = func(ctx Context, msg interface{}) {
 		ctx.SetValue("message")
 	}
@@ -299,15 +299,15 @@ func TestProcessor_process(t *testing.T) {
 	promise = new(kafka.Promise)
 	promise2 := new(kafka.Promise)
 	gomock.InOrder(
-		st.EXPECT().Set("key", []byte("message")),
-		producer.EXPECT().Emit(tableName(group), "key", []byte("message")).Return(promise),
-		st.EXPECT().Set("key", []byte("message2")),
-		producer.EXPECT().Emit(tableName(group), "key", []byte("message2")).Return(promise2),
+		st.EXPECT().Set([]byte("key"), []byte("message")),
+		producer.EXPECT().Emit(tableName(group), []byte("key"), []byte("message")).Return(promise),
+		st.EXPECT().Set([]byte("key"), []byte("message2")),
+		producer.EXPECT().Emit(tableName(group), []byte("key"), []byte("message2")).Return(promise2),
 		st.EXPECT().GetOffset(int64(0)).Return(int64(321), nil),
 		st.EXPECT().SetOffset(int64(323)),
 		consumer.EXPECT().Commit("sometopic", int32(1), int64(123)),
 	)
-	msg = &message{Topic: "sometopic", Key: "key", Partition: 1, Offset: 123, Data: []byte("something")}
+	msg = &message{Topic: "sometopic", Key: []byte("key"), Partition: 1, Offset: 123, Data: []byte("something")}
 	p.graph.callbacks["sometopic"] = func(ctx Context, msg interface{}) {
 		ctx.SetValue("message")
 		ctx.SetValue("message2")
@@ -358,11 +358,11 @@ func TestProcessor_processFail(t *testing.T) {
 	p := newProcessor()
 	promise := new(kafka.Promise)
 	gomock.InOrder(
-		st.EXPECT().Set("key", []byte("message")),
-		producer.EXPECT().Emit(tableName(group), "key", []byte("message")).Return(promise),
+		st.EXPECT().Set([]byte("key"), []byte("message")),
+		producer.EXPECT().Emit(tableName(group), []byte("key"), []byte("message")).Return(promise),
 		st.EXPECT().GetOffset(int64(0)).Return(int64(321), errors.New("getOffset failed")),
 	)
-	msg := &message{Topic: "sometopic", Key: "key", Partition: 1, Offset: 123, Data: []byte("something")}
+	msg := &message{Topic: "sometopic", Key: []byte("key"), Partition: 1, Offset: 123, Data: []byte("something")}
 	p.graph.callbacks["sometopic"] = func(ctx Context, msg interface{}) {
 		ctx.SetValue("message")
 	}
@@ -379,12 +379,12 @@ func TestProcessor_processFail(t *testing.T) {
 	promise = new(kafka.Promise)
 	p = newProcessor()
 	gomock.InOrder(
-		st.EXPECT().Set("key", []byte("message")),
-		producer.EXPECT().Emit(tableName(group), "key", []byte("message")).Return(promise),
+		st.EXPECT().Set([]byte("key"), []byte("message")),
+		producer.EXPECT().Emit(tableName(group), []byte("key"), []byte("message")).Return(promise),
 		st.EXPECT().GetOffset(int64(0)).Return(int64(321), nil),
 		st.EXPECT().SetOffset(int64(322)).Return(errors.New("setOffset failed")),
 	)
-	msg = &message{Topic: "sometopic", Key: "key", Partition: 1, Offset: 123, Data: []byte("something")}
+	msg = &message{Topic: "sometopic", Key: []byte("key"), Partition: 1, Offset: 123, Data: []byte("something")}
 	p.graph.callbacks["sometopic"] = func(ctx Context, msg interface{}) {
 		ctx.SetValue("message")
 	}
@@ -401,13 +401,13 @@ func TestProcessor_processFail(t *testing.T) {
 	promise = new(kafka.Promise)
 	p = newProcessor()
 	gomock.InOrder(
-		st.EXPECT().Set("key", []byte("message")),
-		producer.EXPECT().Emit(tableName(group), "key", []byte("message")).Return(promise),
+		st.EXPECT().Set([]byte("key"), []byte("message")),
+		producer.EXPECT().Emit(tableName(group), []byte("key"), []byte("message")).Return(promise),
 		st.EXPECT().GetOffset(int64(0)).Return(int64(321), nil),
 		st.EXPECT().SetOffset(int64(322)),
 		consumer.EXPECT().Commit("sometopic", int32(1), int64(123)).Return(errors.New("commit error")),
 	)
-	msg = &message{Topic: "sometopic", Key: "key", Partition: 1, Offset: 123, Data: []byte("something")}
+	msg = &message{Topic: "sometopic", Key: []byte("key"), Partition: 1, Offset: 123, Data: []byte("something")}
 	p.graph.callbacks["sometopic"] = func(ctx Context, msg interface{}) {
 		ctx.SetValue("message")
 	}
@@ -845,7 +845,7 @@ func TestProcessor_StartWithErrorAfterRebalance(t *testing.T) {
 	consumer.EXPECT().AddPartition(tableName(group), int32(2), int64(123))
 	// 3. message
 	gomock.InOrder(
-		st.EXPECT().Set("key", value).Return(nil),
+		st.EXPECT().Set([]byte("key"), value).Return(nil),
 		st.EXPECT().SetOffset(int64(1)),
 		st.EXPECT().MarkRecovered(),
 	)
@@ -876,7 +876,7 @@ func TestProcessor_StartWithErrorAfterRebalance(t *testing.T) {
 		Topic:     tableName(group),
 		Partition: 1,
 		Offset:    1,
-		Key:       "key",
+		Key:       []byte("key"),
 		Value:     value,
 	}
 	err = syncWith(t, ch, 1) // with partition
@@ -991,7 +991,7 @@ func TestProcessor_StartWithTableWithErrorAfterRebalance(t *testing.T) {
 		Topic:     topic,
 		Partition: 1,
 		Offset:    2,
-		Key:       "key",
+		Key:       []byte("key"),
 		Value:     value,
 	}
 	// dont wait for that
@@ -1038,7 +1038,7 @@ func TestProcessor_Start(t *testing.T) {
 	consumer.EXPECT().AddPartition(tableName(group), int32(1), int64(123))
 	consumer.EXPECT().AddPartition(tableName(group), int32(2), int64(123))
 	// 3. load message partition 1
-	st.EXPECT().Set("key", value).Return(nil)
+	st.EXPECT().Set([]byte("key"), value).Return(nil)
 	st.EXPECT().SetOffset(int64(1))
 	st.EXPECT().MarkRecovered()
 	// 4. end of recovery partition 1
@@ -1082,7 +1082,7 @@ func TestProcessor_Start(t *testing.T) {
 		Topic:     tableName(group),
 		Partition: 1,
 		Offset:    1,
-		Key:       "key",
+		Key:       []byte("key"),
 		Value:     value,
 	}
 	err = syncWith(t, ch, 1) // with partition 1
@@ -1098,7 +1098,7 @@ func TestProcessor_Start(t *testing.T) {
 		Topic:     topic,
 		Partition: 1,
 		Offset:    1,
-		Key:       "key",
+		Key:       []byte("key"),
 		Value:     value,
 	}
 	err = syncWith(t, ch, 1) // with partition 1
@@ -1196,7 +1196,7 @@ func TestProcessor_StartWithTable(t *testing.T) {
 	consumer.EXPECT().AddPartition(table, int32(1), int64(123)).Times(2)
 	consumer.EXPECT().AddPartition(table, int32(2), int64(123))
 	// 3. message to group table
-	st.EXPECT().Set("key", value).Return(nil)
+	st.EXPECT().Set([]byte("key"), value).Return(nil)
 	st.EXPECT().SetOffset(int64(1))
 	st.EXPECT().MarkRecovered()
 	// 4. finish recovery of partition 1
@@ -1251,7 +1251,7 @@ func TestProcessor_StartWithTable(t *testing.T) {
 		Topic:     tableName(group),
 		Partition: 1,
 		Offset:    1,
-		Key:       "key",
+		Key:       []byte("key"),
 		Value:     value,
 	}
 	err = syncWith(t, ch, 1)
@@ -1279,7 +1279,7 @@ func TestProcessor_StartWithTable(t *testing.T) {
 		Topic:     topic,
 		Partition: 1,
 		Offset:    1,
-		Key:       "key",
+		Key:       []byte("key"),
 		Value:     value,
 	}
 	err = syncWith(t, ch, 1)
@@ -1378,7 +1378,7 @@ func TestProcessor_HasGet(t *testing.T) {
 	ensure.True(t, len(p.partitions) == 1)
 
 	gomock.InOrder(
-		st.EXPECT().Get("item1").Return([]byte("item1-value"), nil),
+		st.EXPECT().Get([]byte("item1")).Return([]byte("item1-value"), nil),
 	)
 
 	value, err := p.Get("item1")
@@ -1431,12 +1431,12 @@ func TestProcessor_HasGetStateless(t *testing.T) {
 	}
 	p.partitionCount = 1
 
-	st.EXPECT().Get("item1").Return(nil, errors.New("some error"))
+	st.EXPECT().Get([]byte("item1")).Return(nil, errors.New("some error"))
 	_, err = p.Get("item1")
 	ensure.NotNil(t, err)
 	ensure.StringContains(t, err.Error(), "error getting item1")
 
-	st.EXPECT().Get("item1").Return(nil, nil)
+	st.EXPECT().Get([]byte("item1")).Return(nil, nil)
 	value, err := p.Get("item1")
 	ensure.Nil(t, err)
 	ensure.True(t, value == nil)

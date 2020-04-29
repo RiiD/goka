@@ -2,6 +2,7 @@ package goka
 
 import (
 	"fmt"
+	"github.com/lovoo/goka/codec"
 	"sync"
 
 	"github.com/lovoo/goka/kafka"
@@ -9,8 +10,9 @@ import (
 
 // Emitter emits messages into a specific Kafka topic, first encoding the message with the given codec.
 type Emitter struct {
-	codec    Codec
-	producer kafka.Producer
+	valueCodec Codec
+	keyCodec   Codec
+	producer   kafka.Producer
 
 	topic string
 
@@ -18,7 +20,12 @@ type Emitter struct {
 }
 
 // NewEmitter creates a new emitter using passed brokers, topic, codec and possibly options.
-func NewEmitter(brokers []string, topic Stream, codec Codec, options ...EmitterOption) (*Emitter, error) {
+func NewEmitter(brokers []string, topic Stream, valueCodec Codec, options ...EmitterOption) (*Emitter, error) {
+	return NewEmitterWithCustomKeyCodec(brokers, topic, new(codec.String), valueCodec, options...)
+}
+
+// NewEmitterWithCustomKeyCodec same as NewEmitter except it allows to specify custom key codec.
+func NewEmitterWithCustomKeyCodec(brokers []string, topic Stream, keyCodec, valudeCodec Codec, options ...EmitterOption) (*Emitter, error) {
 	options = append(
 		// default options comes first
 		[]EmitterOption{},
@@ -29,7 +36,7 @@ func NewEmitter(brokers []string, topic Stream, codec Codec, options ...EmitterO
 
 	opts := new(eoptions)
 
-	err := opts.applyOptions(topic, codec, options...)
+	err := opts.applyOptions(topic, keyCodec, valudeCodec, options...)
 	if err != nil {
 		return nil, fmt.Errorf(errApplyOptions, err)
 	}
@@ -40,33 +47,40 @@ func NewEmitter(brokers []string, topic Stream, codec Codec, options ...EmitterO
 	}
 
 	return &Emitter{
-		codec:    codec,
-		producer: prod,
-		topic:    string(topic),
+		valueCodec: valudeCodec,
+		keyCodec:   keyCodec,
+		producer:   prod,
+		topic:      string(topic),
 	}, nil
 }
 
 // Emit sends a message for passed key using the emitter's codec.
-func (e *Emitter) Emit(key string, msg interface{}) (*kafka.Promise, error) {
+func (e *Emitter) Emit(key interface{}, msg interface{}) (*kafka.Promise, error) {
 	var (
 		err  error
 		data []byte
 	)
 
 	if msg != nil {
-		data, err = e.codec.Encode(msg)
+		data, err = e.valueCodec.Encode(msg)
 		if err != nil {
-			return nil, fmt.Errorf("Error encoding value for key %s in topic %s: %v", key, e.topic, err)
+			return nil, fmt.Errorf("Error encoding value for key %v in topic %s: %v", key, e.topic, err)
 		}
 	}
+
+	keyBytes, err := e.keyCodec.Encode(key)
+	if err != nil {
+		return nil, fmt.Errorf("Error encoding key for key %v in topic %s: %v", key, e.topic, err)
+	}
+
 	e.wg.Add(1)
-	return e.producer.Emit(e.topic, key, data).Then(func(err error) {
+	return e.producer.Emit(e.topic, keyBytes, data).Then(func(err error) {
 		e.wg.Done()
 	}), nil
 }
 
 // EmitSync sends a message to passed topic and key.
-func (e *Emitter) EmitSync(key string, msg interface{}) error {
+func (e *Emitter) EmitSync(key interface{}, msg interface{}) error {
 	var (
 		err     error
 		promise *kafka.Promise

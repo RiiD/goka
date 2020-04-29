@@ -75,7 +75,7 @@ func TestProcessor_ProducerError(t *testing.T) {
 
 	t.Run("SetValue", func(t *testing.T) {
 		tester := tester.New(t)
-		tester.ReplaceEmitHandler(func(topic, key string, value []byte) *kafka.Promise {
+		tester.ReplaceEmitHandler(func(topic string, key, value []byte) *kafka.Promise {
 			return kafka.NewPromise().Finish(errors.New("producer error"))
 		})
 
@@ -110,7 +110,7 @@ func TestProcessor_ProducerError(t *testing.T) {
 
 	t.Run("Emit", func(t *testing.T) {
 		tester := tester.New(t)
-		tester.ReplaceEmitHandler(func(topic, key string, value []byte) *kafka.Promise {
+		tester.ReplaceEmitHandler(func(topic string, key, value []byte) *kafka.Promise {
 			return kafka.NewPromise().Finish(errors.New("producer error"))
 		})
 
@@ -146,7 +146,7 @@ func TestProcessor_ProducerError(t *testing.T) {
 
 	t.Run("Value-stateless", func(t *testing.T) {
 		tester := tester.New(t)
-		tester.ReplaceEmitHandler(func(topic, key string, value []byte) *kafka.Promise {
+		tester.ReplaceEmitHandler(func(topic string, key, value []byte) *kafka.Promise {
 			return kafka.NewPromise().Finish(errors.New("producer error"))
 		})
 
@@ -357,7 +357,7 @@ func TestProcessor_failOnRecover(t *testing.T) {
 			goka.Persist(new(codec.Bytes)),
 		),
 		goka.WithTester(tester),
-		goka.WithUpdateCallback(func(s storage.Storage, partition int32, key string, value []byte) error {
+		goka.WithUpdateCallback(func(s storage.Storage, partition int32, key []byte, value []byte) error {
 			log.Printf("recovered state: %s: %s", key, string(value))
 			recovered++
 			time.Sleep(1 * time.Millisecond)

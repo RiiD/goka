@@ -72,7 +72,7 @@ func readConfig(filename string) (*Config, error) {
 
 type nopPublisher struct{}
 
-func (p *nopPublisher) Publish(ctx context.Context, key string, event *Event) error {
+func (p *nopPublisher) Publish(ctx context.Context, key interface{}, event *Event) error {
 	fmt.Printf("published ->key: `%v` ->event: `%v`\n", key, event)
 	return nil
 }

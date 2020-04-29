@@ -28,7 +28,7 @@ type constHasher struct {
 	partition uint32
 }
 
-func (ch *constHasher) Sum(b []byte) []byte {
+func (ch *constHasher) Sum([]byte) []byte {
 	return nil
 }
 
@@ -53,12 +53,13 @@ func NewConstHasher(part uint32) hash.Hash32 {
 	return &constHasher{partition: part}
 }
 
-func createTestView(t *testing.T, consumer kafka.Consumer, sb storage.Builder, tm kafka.TopicManager) *View {
+func createTestView(_ *testing.T, consumer kafka.Consumer, sb storage.Builder, tm kafka.TopicManager) *View {
 	recoveredMessages = 0
 	opts := &voptions{
-		log:        logger.Default(),
-		tableCodec: new(codec.String),
-		updateCallback: func(s storage.Storage, partition int32, key string, value []byte) error {
+		log:             logger.Default(),
+		tableValueCodec: new(codec.String),
+		tableKeyCodec:   new(codec.String),
+		updateCallback: func(s storage.Storage, partition int32, key []byte, value []byte) error {
 			if err := DefaultUpdate(s, partition, key, value); err != nil {
 				return err
 			}
@@ -138,8 +139,8 @@ func TestView_HasGet(t *testing.T) {
 	gomock.InOrder(
 		tm.EXPECT().Partitions(tableName(group)).Return([]int32{0, 1, 2}, nil),
 		tm.EXPECT().Close(),
-		st.EXPECT().Has("item1").Return(false, nil),
-		st.EXPECT().Get("item1").Return([]byte("item1-value"), nil),
+		st.EXPECT().Has([]byte("item1")).Return(false, nil),
+		st.EXPECT().Get([]byte("item1")).Return([]byte("item1-value"), nil),
 	)
 
 	err := v.createPartitions(nil)
@@ -415,12 +416,18 @@ func TestView_Restart(t *testing.T) {
 }
 
 func TestView_GetErrors(t *testing.T) {
-	v := &View{opts: &voptions{hasher: DefaultHasher()}}
+	v := &View{opts: &voptions{hasher: DefaultHasher(), tableKeyCodec: new(codec.String)}}
 	_, err := v.Get("hey")
 	ensure.NotNil(t, err)
 
 	_, err = v.Has("hey")
 	ensure.NotNil(t, err)
+
+	_, err = v.Get(123)
+	ensure.StringContains(t, err.Error(), "error encoding key")
+
+	_, err = v.Has(123)
+	ensure.StringContains(t, err.Error(), "error encoding key")
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -441,7 +448,7 @@ func TestView_GetErrors(t *testing.T) {
 	err = v.createPartitions(nil)
 	ensure.Nil(t, err)
 
-	st.EXPECT().Get("hey").Return(nil, errors.New("some error"))
+	st.EXPECT().Get([]byte("hey")).Return(nil, errors.New("some error"))
 	_, err = v.Get("hey")
 	ensure.NotNil(t, err)
 }
@@ -484,7 +491,7 @@ func TestView_Evict(t *testing.T) {
 	val := "some-val"
 
 	st := storage.NewMemory()
-	err := st.Set(key, []byte(val))
+	err := st.Set([]byte(key), []byte(val))
 	ensure.Nil(t, err)
 
 	v := &View{
@@ -495,7 +502,8 @@ func TestView_Evict(t *testing.T) {
 			hasher: func() hash.Hash32 {
 				return NewConstHasher(0)
 			},
-			tableCodec: new(codec.String),
+			tableValueCodec: new(codec.String),
+			tableKeyCodec:   new(codec.String),
 		},
 	}
 
@@ -509,6 +517,9 @@ func TestView_Evict(t *testing.T) {
 	vinf, err = v.Get(key)
 	ensure.Nil(t, err)
 	ensure.Nil(t, vinf)
+
+	err = v.Evict(123)
+	ensure.StringContains(t, err.Error(), "error encoding key")
 }
 
 func doTimed(t *testing.T, do func()) error {

@@ -206,7 +206,7 @@ func (qc *queueConsumer) catchupQueue(fromOffset int64) int {
 	var forwardedMessages int
 	for _, msg := range qc.queue.messagesFromOffset(fromOffset) {
 		qc.addToBuffer(&kafka.Message{
-			Key:       string(msg.key),
+			Key:       msg.key,
 			Offset:    msg.offset,
 			Partition: 0,
 			Timestamp: time.Unix(msg.offset, 0),

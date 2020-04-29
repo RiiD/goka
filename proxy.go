@@ -111,7 +111,7 @@ func (s *storageProxy) Close() error {
 	return s.closedOnce.Do(s.Storage.Close)
 }
 
-func (s *storageProxy) Update(k string, v []byte) error {
+func (s *storageProxy) Update(k []byte, v []byte) error {
 	return s.update(s.Storage, s.partition, k, v)
 }
 
