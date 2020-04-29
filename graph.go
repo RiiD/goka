@@ -42,8 +42,9 @@ type GroupGraph struct {
 	loopStream    []Edge
 	groupTable    []Edge
 
-	codecs    map[string]Codec
-	callbacks map[string]ProcessCallback
+	valueCodecs map[string]Codec
+	keyCodecs   map[string]Codec
+	callbacks   map[string]ProcessCallback
 
 	joinCheck map[string]bool
 }
@@ -101,8 +102,12 @@ func (gg *GroupGraph) copartitioned() Edges {
 	return append(gg.inputStreams, gg.inputTables...)
 }
 
-func (gg *GroupGraph) codec(topic string) Codec {
-	return gg.codecs[topic]
+func (gg *GroupGraph) valueCodec(topic string) Codec {
+	return gg.valueCodecs[topic]
+}
+
+func (gg *GroupGraph) keyCodec(topic string) Codec {
+	return gg.keyCodecs[topic]
 }
 
 func (gg *GroupGraph) callback(topic string) ProcessCallback {
@@ -117,9 +122,10 @@ func (gg *GroupGraph) joint(topic string) bool {
 // edges.
 func DefineGroup(group Group, edges ...Edge) *GroupGraph {
 	gg := GroupGraph{group: string(group),
-		codecs:    make(map[string]Codec),
-		callbacks: make(map[string]ProcessCallback),
-		joinCheck: make(map[string]bool),
+		valueCodecs: make(map[string]Codec),
+		keyCodecs:   make(map[string]Codec),
+		callbacks:   make(map[string]ProcessCallback),
+		joinCheck:   make(map[string]bool),
 	}
 
 	for _, e := range edges {
@@ -128,33 +134,40 @@ func DefineGroup(group Group, edges ...Edge) *GroupGraph {
 			for _, input := range e {
 				gg.validateInputTopic(input.Topic())
 				inputStr := input.(*inputStream)
-				gg.codecs[input.Topic()] = input.ValueCodec()
+				gg.valueCodecs[input.Topic()] = input.ValueCodec()
+				gg.keyCodecs[input.Topic()] = input.KeyCodec()
 				gg.callbacks[input.Topic()] = inputStr.cb
 				gg.inputStreams = append(gg.inputStreams, inputStr)
 			}
 		case *inputStream:
 			gg.validateInputTopic(e.Topic())
-			gg.codecs[e.Topic()] = e.ValueCodec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.callbacks[e.Topic()] = e.cb
 			gg.inputStreams = append(gg.inputStreams, e)
 		case *loopStream:
 			e.setGroup(group)
-			gg.codecs[e.Topic()] = e.ValueCodec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.callbacks[e.Topic()] = e.cb
 			gg.loopStream = append(gg.loopStream, e)
 		case *outputStream:
-			gg.codecs[e.Topic()] = e.ValueCodec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.outputStreams = append(gg.outputStreams, e)
 		case *inputTable:
-			gg.codecs[e.Topic()] = e.ValueCodec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.inputTables = append(gg.inputTables, e)
 			gg.joinCheck[e.Topic()] = true
 		case *crossTable:
-			gg.codecs[e.Topic()] = e.ValueCodec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.crossTables = append(gg.crossTables, e)
 		case *groupTable:
 			e.setGroup(group)
-			gg.codecs[e.Topic()] = e.ValueCodec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.groupTable = append(gg.groupTable, e)
 		}
 	}
@@ -233,7 +246,7 @@ func (t *topicDef) Topic() string {
 }
 
 func (t *topicDef) String() string {
-	return fmt.Sprintf("%s/%T", t.name, t.valueCodec)
+	return fmt.Sprintf("%s/%T:%T", t.name, t.keyCodec, t.valueCodec)
 }
 
 func (t *topicDef) ValueCodec() Codec {
@@ -278,7 +291,7 @@ func (is inputStreams) String() string {
 		return "empty input streams"
 	}
 
-	return fmt.Sprintf("input streams: %s/%T", is.Topic(), is.ValueCodec())
+	return fmt.Sprintf("input streams: %s/%T:%T", is.Topic(), is.KeyCodec(), is.ValueCodec())
 }
 
 func (is inputStreams) Topic() string {

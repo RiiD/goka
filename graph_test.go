@@ -74,15 +74,29 @@ func TestGroupGraph_Validate(t *testing.T) {
 
 }
 
-func TestGroupGraph_codec(t *testing.T) {
+func TestGroupGraph_valueCodec(t *testing.T) {
 	g := DefineGroup("group",
 		Input("input-topic", c, cb),
 		Inputs(Streams{"input-topic2", "input-topic3"}, c, cb),
 	)
 
 	for _, topic := range []string{"input-topic", "input-topic2", "input-topic3"} {
-		codec := g.codec(topic)
+		codec := g.valueCodec(topic)
 		ensure.DeepEqual(t, codec, c)
+	}
+
+}
+
+func TestGroupGraph_keyCodec(t *testing.T) {
+	keyCodec := new(codec.String)
+	g := DefineGroup("group",
+		InputWithCustomKeyCodec("input-topic", keyCodec, c, cb),
+		InputsWithCustomKeyCodec(Streams{"input-topic2", "input-topic3"}, keyCodec, c, cb),
+	)
+
+	for _, topic := range []string{"input-topic", "input-topic2", "input-topic3"} {
+		codec := g.keyCodec(topic)
+		ensure.DeepEqual(t, codec, keyCodec)
 	}
 
 }
@@ -152,5 +166,5 @@ func TestGroupGraph_Inputs(t *testing.T) {
 
 	topics := Inputs(Streams{"a", "b", "c"}, c, cb)
 	ensure.DeepEqual(t, topics.Topic(), "a,b,c")
-	ensure.True(t, strings.Contains(topics.String(), "a,b,c/*codec.String"))
+	ensure.True(t, strings.Contains(topics.String(), "a,b,c/*codec.String:*codec.String"))
 }

@@ -109,9 +109,9 @@ func (ctx *cbContext) Emit(topic Stream, key string, value interface{}) {
 	if tableName(ctx.graph.Group()) == string(topic) {
 		ctx.Fail(errors.New("cannot emit to table topic (use SetValue instead)"))
 	}
-	c := ctx.graph.codec(string(topic))
+	c := ctx.graph.valueCodec(string(topic))
 	if c == nil {
-		ctx.Fail(fmt.Errorf("no codec for topic %s", topic))
+		ctx.Fail(fmt.Errorf("no value codec for topic %s", topic))
 	}
 
 	var data []byte
@@ -218,7 +218,7 @@ func (ctx *cbContext) Join(topic Table) interface{} {
 		return nil
 	}
 
-	value, err := ctx.graph.codec(string(topic)).Decode(data)
+	value, err := ctx.graph.valueCodec(string(topic)).Decode(data)
 	if err != nil {
 		ctx.Fail(fmt.Errorf("error decoding value key %s of table %s: %v", ctx.Key(), topic, err))
 	}

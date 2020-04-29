@@ -787,7 +787,7 @@ func (g *Processor) process(msg *message, st storage.Storage, wg *sync.WaitGroup
 		m = nil
 	default:
 		// get stream subcription
-		codec := g.graph.codec(msg.Topic)
+		codec := g.graph.valueCodec(msg.Topic)
 		if codec == nil {
 			return 0, fmt.Errorf("cannot handle topic %s", msg.Topic)
 		}
