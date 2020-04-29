@@ -276,7 +276,7 @@ func TestSimpleConsumer_ErrorBlocked(t *testing.T) {
 	pc.EXPECT().HighWaterMarkOffset().Return(int64(0))
 	mo, ok := (<-ch).(*Message)
 	ensure.True(t, ok)
-	ensure.DeepEqual(t, mo, &Message{Topic: "sometopic", Partition: 123, Key: "somekey", Value: []byte("somevalue"), Header: map[string][]byte{}})
+	ensure.DeepEqual(t, mo, &Message{Topic: "sometopic", Partition: 123, Key: []byte("somekey"), Value: []byte("somevalue"), Header: map[string][]byte{}})
 
 	messages <- &sarama.ConsumerMessage{
 		Key:       []byte("somekey"),
@@ -292,7 +292,7 @@ func TestSimpleConsumer_ErrorBlocked(t *testing.T) {
 	pc.EXPECT().HighWaterMarkOffset().Return(int64(0))
 	mo1, ok := (<-ch).(*Message)
 	ensure.True(t, ok)
-	ensure.DeepEqual(t, mo1, &Message{Topic: "sometopic", Partition: 123, Key: "somekey", Value: []byte("somevalue"), Header: map[string][]byte{"someHeader": []byte("someHeaderValue")}})
+	ensure.DeepEqual(t, mo1, &Message{Topic: "sometopic", Partition: 123, Key: []byte("somekey"), Value: []byte("somevalue"), Header: map[string][]byte{"someHeader": []byte("someHeaderValue")}})
 
 	// we now write, but don't read events
 	messages <- &sarama.ConsumerMessage{

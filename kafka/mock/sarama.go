@@ -10,34 +10,30 @@ import (
 	reflect "reflect"
 )
 
-// MockClient is a mock of Client interface
+// MockClient is a mock of Client interface.
 type MockClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockClientMockRecorder
 }
 
-func (m *MockClient) RefreshController() (*sarama.Broker, error) {
-	panic("implement me")
-}
-
-// MockClientMockRecorder is the mock recorder for MockClient
+// MockClientMockRecorder is the mock recorder for MockClient.
 type MockClientMockRecorder struct {
 	mock *MockClient
 }
 
-// NewMockClient creates a new mock instance
+// NewMockClient creates a new mock instance.
 func NewMockClient(ctrl *gomock.Controller) *MockClient {
 	mock := &MockClient{ctrl: ctrl}
 	mock.recorder = &MockClientMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
-// Brokers mocks base method
+// Brokers mocks base method.
 func (m *MockClient) Brokers() []*sarama.Broker {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Brokers")
@@ -45,13 +41,13 @@ func (m *MockClient) Brokers() []*sarama.Broker {
 	return ret0
 }
 
-// Brokers indicates an expected call of Brokers
+// Brokers indicates an expected call of Brokers.
 func (mr *MockClientMockRecorder) Brokers() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Brokers", reflect.TypeOf((*MockClient)(nil).Brokers))
 }
 
-// Close mocks base method
+// Close mocks base method.
 func (m *MockClient) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
@@ -59,13 +55,13 @@ func (m *MockClient) Close() error {
 	return ret0
 }
 
-// Close indicates an expected call of Close
+// Close indicates an expected call of Close.
 func (mr *MockClientMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockClient)(nil).Close))
 }
 
-// Closed mocks base method
+// Closed mocks base method.
 func (m *MockClient) Closed() bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Closed")
@@ -73,13 +69,13 @@ func (m *MockClient) Closed() bool {
 	return ret0
 }
 
-// Closed indicates an expected call of Closed
+// Closed indicates an expected call of Closed.
 func (mr *MockClientMockRecorder) Closed() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Closed", reflect.TypeOf((*MockClient)(nil).Closed))
 }
 
-// Config mocks base method
+// Config mocks base method.
 func (m *MockClient) Config() *sarama.Config {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Config")
@@ -87,13 +83,13 @@ func (m *MockClient) Config() *sarama.Config {
 	return ret0
 }
 
-// Config indicates an expected call of Config
+// Config indicates an expected call of Config.
 func (mr *MockClientMockRecorder) Config() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockClient)(nil).Config))
 }
 
-// Controller mocks base method
+// Controller mocks base method.
 func (m *MockClient) Controller() (*sarama.Broker, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Controller")
@@ -102,13 +98,13 @@ func (m *MockClient) Controller() (*sarama.Broker, error) {
 	return ret0, ret1
 }
 
-// Controller indicates an expected call of Controller
+// Controller indicates an expected call of Controller.
 func (mr *MockClientMockRecorder) Controller() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Controller", reflect.TypeOf((*MockClient)(nil).Controller))
 }
 
-// Coordinator mocks base method
+// Coordinator mocks base method.
 func (m *MockClient) Coordinator(arg0 string) (*sarama.Broker, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Coordinator", arg0)
@@ -117,13 +113,13 @@ func (m *MockClient) Coordinator(arg0 string) (*sarama.Broker, error) {
 	return ret0, ret1
 }
 
-// Coordinator indicates an expected call of Coordinator
+// Coordinator indicates an expected call of Coordinator.
 func (mr *MockClientMockRecorder) Coordinator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Coordinator", reflect.TypeOf((*MockClient)(nil).Coordinator), arg0)
 }
 
-// GetOffset mocks base method
+// GetOffset mocks base method.
 func (m *MockClient) GetOffset(arg0 string, arg1 int32, arg2 int64) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOffset", arg0, arg1, arg2)
@@ -132,13 +128,13 @@ func (m *MockClient) GetOffset(arg0 string, arg1 int32, arg2 int64) (int64, erro
 	return ret0, ret1
 }
 
-// GetOffset indicates an expected call of GetOffset
+// GetOffset indicates an expected call of GetOffset.
 func (mr *MockClientMockRecorder) GetOffset(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOffset", reflect.TypeOf((*MockClient)(nil).GetOffset), arg0, arg1, arg2)
 }
 
-// InSyncReplicas mocks base method
+// InSyncReplicas mocks base method.
 func (m *MockClient) InSyncReplicas(arg0 string, arg1 int32) ([]int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InSyncReplicas", arg0, arg1)
@@ -147,13 +143,13 @@ func (m *MockClient) InSyncReplicas(arg0 string, arg1 int32) ([]int32, error) {
 	return ret0, ret1
 }
 
-// InSyncReplicas indicates an expected call of InSyncReplicas
+// InSyncReplicas indicates an expected call of InSyncReplicas.
 func (mr *MockClientMockRecorder) InSyncReplicas(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InSyncReplicas", reflect.TypeOf((*MockClient)(nil).InSyncReplicas), arg0, arg1)
 }
 
-// InitProducerID mocks base method
+// InitProducerID mocks base method.
 func (m *MockClient) InitProducerID() (*sarama.InitProducerIDResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InitProducerID")
@@ -162,13 +158,13 @@ func (m *MockClient) InitProducerID() (*sarama.InitProducerIDResponse, error) {
 	return ret0, ret1
 }
 
-// InitProducerID indicates an expected call of InitProducerID
+// InitProducerID indicates an expected call of InitProducerID.
 func (mr *MockClientMockRecorder) InitProducerID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitProducerID", reflect.TypeOf((*MockClient)(nil).InitProducerID))
 }
 
-// Leader mocks base method
+// Leader mocks base method.
 func (m *MockClient) Leader(arg0 string, arg1 int32) (*sarama.Broker, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Leader", arg0, arg1)
@@ -177,13 +173,13 @@ func (m *MockClient) Leader(arg0 string, arg1 int32) (*sarama.Broker, error) {
 	return ret0, ret1
 }
 
-// Leader indicates an expected call of Leader
+// Leader indicates an expected call of Leader.
 func (mr *MockClientMockRecorder) Leader(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Leader", reflect.TypeOf((*MockClient)(nil).Leader), arg0, arg1)
 }
 
-// OfflineReplicas mocks base method
+// OfflineReplicas mocks base method.
 func (m *MockClient) OfflineReplicas(arg0 string, arg1 int32) ([]int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "OfflineReplicas", arg0, arg1)
@@ -192,13 +188,13 @@ func (m *MockClient) OfflineReplicas(arg0 string, arg1 int32) ([]int32, error) {
 	return ret0, ret1
 }
 
-// OfflineReplicas indicates an expected call of OfflineReplicas
+// OfflineReplicas indicates an expected call of OfflineReplicas.
 func (mr *MockClientMockRecorder) OfflineReplicas(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OfflineReplicas", reflect.TypeOf((*MockClient)(nil).OfflineReplicas), arg0, arg1)
 }
 
-// Partitions mocks base method
+// Partitions mocks base method.
 func (m *MockClient) Partitions(arg0 string) ([]int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Partitions", arg0)
@@ -207,13 +203,28 @@ func (m *MockClient) Partitions(arg0 string) ([]int32, error) {
 	return ret0, ret1
 }
 
-// Partitions indicates an expected call of Partitions
+// Partitions indicates an expected call of Partitions.
 func (mr *MockClientMockRecorder) Partitions(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Partitions", reflect.TypeOf((*MockClient)(nil).Partitions), arg0)
 }
 
-// RefreshCoordinator mocks base method
+// RefreshController mocks base method.
+func (m *MockClient) RefreshController() (*sarama.Broker, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefreshController")
+	ret0, _ := ret[0].(*sarama.Broker)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RefreshController indicates an expected call of RefreshController.
+func (mr *MockClientMockRecorder) RefreshController() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshController", reflect.TypeOf((*MockClient)(nil).RefreshController))
+}
+
+// RefreshCoordinator mocks base method.
 func (m *MockClient) RefreshCoordinator(arg0 string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RefreshCoordinator", arg0)
@@ -221,13 +232,13 @@ func (m *MockClient) RefreshCoordinator(arg0 string) error {
 	return ret0
 }
 
-// RefreshCoordinator indicates an expected call of RefreshCoordinator
+// RefreshCoordinator indicates an expected call of RefreshCoordinator.
 func (mr *MockClientMockRecorder) RefreshCoordinator(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshCoordinator", reflect.TypeOf((*MockClient)(nil).RefreshCoordinator), arg0)
 }
 
-// RefreshMetadata mocks base method
+// RefreshMetadata mocks base method.
 func (m *MockClient) RefreshMetadata(arg0 ...string) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{}
@@ -239,13 +250,13 @@ func (m *MockClient) RefreshMetadata(arg0 ...string) error {
 	return ret0
 }
 
-// RefreshMetadata indicates an expected call of RefreshMetadata
+// RefreshMetadata indicates an expected call of RefreshMetadata.
 func (mr *MockClientMockRecorder) RefreshMetadata(arg0 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshMetadata", reflect.TypeOf((*MockClient)(nil).RefreshMetadata), arg0...)
 }
 
-// Replicas mocks base method
+// Replicas mocks base method.
 func (m *MockClient) Replicas(arg0 string, arg1 int32) ([]int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Replicas", arg0, arg1)
@@ -254,13 +265,13 @@ func (m *MockClient) Replicas(arg0 string, arg1 int32) ([]int32, error) {
 	return ret0, ret1
 }
 
-// Replicas indicates an expected call of Replicas
+// Replicas indicates an expected call of Replicas.
 func (mr *MockClientMockRecorder) Replicas(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replicas", reflect.TypeOf((*MockClient)(nil).Replicas), arg0, arg1)
 }
 
-// Topics mocks base method
+// Topics mocks base method.
 func (m *MockClient) Topics() ([]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Topics")
@@ -269,13 +280,13 @@ func (m *MockClient) Topics() ([]string, error) {
 	return ret0, ret1
 }
 
-// Topics indicates an expected call of Topics
+// Topics indicates an expected call of Topics.
 func (mr *MockClientMockRecorder) Topics() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Topics", reflect.TypeOf((*MockClient)(nil).Topics))
 }
 
-// WritablePartitions mocks base method
+// WritablePartitions mocks base method.
 func (m *MockClient) WritablePartitions(arg0 string) ([]int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WritablePartitions", arg0)
@@ -284,36 +295,36 @@ func (m *MockClient) WritablePartitions(arg0 string) ([]int32, error) {
 	return ret0, ret1
 }
 
-// WritablePartitions indicates an expected call of WritablePartitions
+// WritablePartitions indicates an expected call of WritablePartitions.
 func (mr *MockClientMockRecorder) WritablePartitions(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WritablePartitions", reflect.TypeOf((*MockClient)(nil).WritablePartitions), arg0)
 }
 
-// MockConsumer is a mock of Consumer interface
+// MockConsumer is a mock of Consumer interface.
 type MockConsumer struct {
 	ctrl     *gomock.Controller
 	recorder *MockConsumerMockRecorder
 }
 
-// MockConsumerMockRecorder is the mock recorder for MockConsumer
+// MockConsumerMockRecorder is the mock recorder for MockConsumer.
 type MockConsumerMockRecorder struct {
 	mock *MockConsumer
 }
 
-// NewMockConsumer creates a new mock instance
+// NewMockConsumer creates a new mock instance.
 func NewMockConsumer(ctrl *gomock.Controller) *MockConsumer {
 	mock := &MockConsumer{ctrl: ctrl}
 	mock.recorder = &MockConsumerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockConsumer) EXPECT() *MockConsumerMockRecorder {
 	return m.recorder
 }
 
-// Close mocks base method
+// Close mocks base method.
 func (m *MockConsumer) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
@@ -321,13 +332,13 @@ func (m *MockConsumer) Close() error {
 	return ret0
 }
 
-// Close indicates an expected call of Close
+// Close indicates an expected call of Close.
 func (mr *MockConsumerMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockConsumer)(nil).Close))
 }
 
-// ConsumePartition mocks base method
+// ConsumePartition mocks base method.
 func (m *MockConsumer) ConsumePartition(arg0 string, arg1 int32, arg2 int64) (sarama.PartitionConsumer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConsumePartition", arg0, arg1, arg2)
@@ -336,13 +347,13 @@ func (m *MockConsumer) ConsumePartition(arg0 string, arg1 int32, arg2 int64) (sa
 	return ret0, ret1
 }
 
-// ConsumePartition indicates an expected call of ConsumePartition
+// ConsumePartition indicates an expected call of ConsumePartition.
 func (mr *MockConsumerMockRecorder) ConsumePartition(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumePartition", reflect.TypeOf((*MockConsumer)(nil).ConsumePartition), arg0, arg1, arg2)
 }
 
-// HighWaterMarks mocks base method
+// HighWaterMarks mocks base method.
 func (m *MockConsumer) HighWaterMarks() map[string]map[int32]int64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HighWaterMarks")
@@ -350,13 +361,13 @@ func (m *MockConsumer) HighWaterMarks() map[string]map[int32]int64 {
 	return ret0
 }
 
-// HighWaterMarks indicates an expected call of HighWaterMarks
+// HighWaterMarks indicates an expected call of HighWaterMarks.
 func (mr *MockConsumerMockRecorder) HighWaterMarks() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HighWaterMarks", reflect.TypeOf((*MockConsumer)(nil).HighWaterMarks))
 }
 
-// Partitions mocks base method
+// Partitions mocks base method.
 func (m *MockConsumer) Partitions(arg0 string) ([]int32, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Partitions", arg0)
@@ -365,13 +376,13 @@ func (m *MockConsumer) Partitions(arg0 string) ([]int32, error) {
 	return ret0, ret1
 }
 
-// Partitions indicates an expected call of Partitions
+// Partitions indicates an expected call of Partitions.
 func (mr *MockConsumerMockRecorder) Partitions(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Partitions", reflect.TypeOf((*MockConsumer)(nil).Partitions), arg0)
 }
 
-// Topics mocks base method
+// Topics mocks base method.
 func (m *MockConsumer) Topics() ([]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Topics")
@@ -380,48 +391,48 @@ func (m *MockConsumer) Topics() ([]string, error) {
 	return ret0, ret1
 }
 
-// Topics indicates an expected call of Topics
+// Topics indicates an expected call of Topics.
 func (mr *MockConsumerMockRecorder) Topics() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Topics", reflect.TypeOf((*MockConsumer)(nil).Topics))
 }
 
-// MockPartitionConsumer is a mock of PartitionConsumer interface
+// MockPartitionConsumer is a mock of PartitionConsumer interface.
 type MockPartitionConsumer struct {
 	ctrl     *gomock.Controller
 	recorder *MockPartitionConsumerMockRecorder
 }
 
-// MockPartitionConsumerMockRecorder is the mock recorder for MockPartitionConsumer
+// MockPartitionConsumerMockRecorder is the mock recorder for MockPartitionConsumer.
 type MockPartitionConsumerMockRecorder struct {
 	mock *MockPartitionConsumer
 }
 
-// NewMockPartitionConsumer creates a new mock instance
+// NewMockPartitionConsumer creates a new mock instance.
 func NewMockPartitionConsumer(ctrl *gomock.Controller) *MockPartitionConsumer {
 	mock := &MockPartitionConsumer{ctrl: ctrl}
 	mock.recorder = &MockPartitionConsumerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockPartitionConsumer) EXPECT() *MockPartitionConsumerMockRecorder {
 	return m.recorder
 }
 
-// AsyncClose mocks base method
+// AsyncClose mocks base method.
 func (m *MockPartitionConsumer) AsyncClose() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AsyncClose")
 }
 
-// AsyncClose indicates an expected call of AsyncClose
+// AsyncClose indicates an expected call of AsyncClose.
 func (mr *MockPartitionConsumerMockRecorder) AsyncClose() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AsyncClose", reflect.TypeOf((*MockPartitionConsumer)(nil).AsyncClose))
 }
 
-// Close mocks base method
+// Close mocks base method.
 func (m *MockPartitionConsumer) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
@@ -429,13 +440,13 @@ func (m *MockPartitionConsumer) Close() error {
 	return ret0
 }
 
-// Close indicates an expected call of Close
+// Close indicates an expected call of Close.
 func (mr *MockPartitionConsumerMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockPartitionConsumer)(nil).Close))
 }
 
-// Errors mocks base method
+// Errors mocks base method.
 func (m *MockPartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Errors")
@@ -443,13 +454,13 @@ func (m *MockPartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 	return ret0
 }
 
-// Errors indicates an expected call of Errors
+// Errors indicates an expected call of Errors.
 func (mr *MockPartitionConsumerMockRecorder) Errors() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Errors", reflect.TypeOf((*MockPartitionConsumer)(nil).Errors))
 }
 
-// HighWaterMarkOffset mocks base method
+// HighWaterMarkOffset mocks base method.
 func (m *MockPartitionConsumer) HighWaterMarkOffset() int64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HighWaterMarkOffset")
@@ -457,13 +468,13 @@ func (m *MockPartitionConsumer) HighWaterMarkOffset() int64 {
 	return ret0
 }
 
-// HighWaterMarkOffset indicates an expected call of HighWaterMarkOffset
+// HighWaterMarkOffset indicates an expected call of HighWaterMarkOffset.
 func (mr *MockPartitionConsumerMockRecorder) HighWaterMarkOffset() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HighWaterMarkOffset", reflect.TypeOf((*MockPartitionConsumer)(nil).HighWaterMarkOffset))
 }
 
-// Messages mocks base method
+// Messages mocks base method.
 func (m *MockPartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Messages")
@@ -471,7 +482,7 @@ func (m *MockPartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return ret0
 }
 
-// Messages indicates an expected call of Messages
+// Messages indicates an expected call of Messages.
 func (mr *MockPartitionConsumerMockRecorder) Messages() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Messages", reflect.TypeOf((*MockPartitionConsumer)(nil).Messages))

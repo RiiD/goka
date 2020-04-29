@@ -150,7 +150,7 @@ func (c *simpleConsumer) run(pc sarama.PartitionConsumer, topic string, partitio
 				Topic:     m.Topic,
 				Partition: m.Partition,
 				Offset:    m.Offset,
-				Key:       string(m.Key),
+				Key:       m.Key,
 				Value:     m.Value,
 				Timestamp: m.Timestamp,
 				Header:    headers,

@@ -6,35 +6,35 @@ package mock
 
 import (
 	sarama "github.com/Shopify/sarama"
-	sarama_cluster "github.com/bsm/sarama-cluster"
+	cluster "github.com/bsm/sarama-cluster"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
 
-// MockclusterConsumer is a mock of clusterConsumer interface
+// MockclusterConsumer is a mock of clusterConsumer interface.
 type MockclusterConsumer struct {
 	ctrl     *gomock.Controller
 	recorder *MockclusterConsumerMockRecorder
 }
 
-// MockclusterConsumerMockRecorder is the mock recorder for MockclusterConsumer
+// MockclusterConsumerMockRecorder is the mock recorder for MockclusterConsumer.
 type MockclusterConsumerMockRecorder struct {
 	mock *MockclusterConsumer
 }
 
-// NewMockclusterConsumer creates a new mock instance
+// NewMockclusterConsumer creates a new mock instance.
 func NewMockclusterConsumer(ctrl *gomock.Controller) *MockclusterConsumer {
 	mock := &MockclusterConsumer{ctrl: ctrl}
 	mock.recorder = &MockclusterConsumerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockclusterConsumer) EXPECT() *MockclusterConsumerMockRecorder {
 	return m.recorder
 }
 
-// Close mocks base method
+// Close mocks base method.
 func (m *MockclusterConsumer) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
@@ -42,39 +42,39 @@ func (m *MockclusterConsumer) Close() error {
 	return ret0
 }
 
-// Close indicates an expected call of Close
+// Close indicates an expected call of Close.
 func (mr *MockclusterConsumerMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockclusterConsumer)(nil).Close))
 }
 
-// MarkPartitionOffset mocks base method
+// MarkPartitionOffset mocks base method.
 func (m *MockclusterConsumer) MarkPartitionOffset(topic string, partition int32, offset int64, metadata string) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "MarkPartitionOffset", topic, partition, offset, metadata)
 }
 
-// MarkPartitionOffset indicates an expected call of MarkPartitionOffset
+// MarkPartitionOffset indicates an expected call of MarkPartitionOffset.
 func (mr *MockclusterConsumerMockRecorder) MarkPartitionOffset(topic, partition, offset, metadata interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkPartitionOffset", reflect.TypeOf((*MockclusterConsumer)(nil).MarkPartitionOffset), topic, partition, offset, metadata)
 }
 
-// Notifications mocks base method
-func (m *MockclusterConsumer) Notifications() <-chan *sarama_cluster.Notification {
+// Notifications mocks base method.
+func (m *MockclusterConsumer) Notifications() <-chan *cluster.Notification {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Notifications")
-	ret0, _ := ret[0].(<-chan *sarama_cluster.Notification)
+	ret0, _ := ret[0].(<-chan *cluster.Notification)
 	return ret0
 }
 
-// Notifications indicates an expected call of Notifications
+// Notifications indicates an expected call of Notifications.
 func (mr *MockclusterConsumerMockRecorder) Notifications() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Notifications", reflect.TypeOf((*MockclusterConsumer)(nil).Notifications))
 }
 
-// Messages mocks base method
+// Messages mocks base method.
 func (m *MockclusterConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Messages")
@@ -82,13 +82,13 @@ func (m *MockclusterConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return ret0
 }
 
-// Messages indicates an expected call of Messages
+// Messages indicates an expected call of Messages.
 func (mr *MockclusterConsumerMockRecorder) Messages() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Messages", reflect.TypeOf((*MockclusterConsumer)(nil).Messages))
 }
 
-// Errors mocks base method
+// Errors mocks base method.
 func (m *MockclusterConsumer) Errors() <-chan error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Errors")
@@ -96,7 +96,7 @@ func (m *MockclusterConsumer) Errors() <-chan error {
 	return ret0
 }
 
-// Errors indicates an expected call of Errors
+// Errors indicates an expected call of Errors.
 func (mr *MockclusterConsumerMockRecorder) Errors() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Errors", reflect.TypeOf((*MockclusterConsumer)(nil).Errors))

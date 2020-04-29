@@ -253,7 +253,7 @@ func TestGroupConsumer_GroupConsumeMessages(t *testing.T) {
 		Topic:     topic1,
 		Partition: 0,
 		Offset:    0,
-		Key:       string(key),
+		Key:       key,
 		Value:     value,
 		Header:    make(map[string][]byte),
 	})
@@ -457,7 +457,7 @@ func TestGroupConsumer_GroupNotificationsAfterMessages(t *testing.T) {
 		Topic:     topic1,
 		Partition: 0,
 		Offset:    0,
-		Key:       string(key),
+		Key:       key,
 		Value:     value,
 		Header:    make(map[string][]byte),
 	})
@@ -564,7 +564,7 @@ func TestGroupConsumer_GroupEmptyNotifications(t *testing.T) {
 		Topic:     topic1,
 		Partition: 0,
 		Offset:    0,
-		Key:       string(key),
+		Key:       key,
 		Value:     value,
 		Header:    make(map[string][]byte),
 	})

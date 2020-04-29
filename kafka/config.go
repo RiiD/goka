@@ -16,6 +16,7 @@ func NewConfig() *cluster.Config {
 	// this configures the initial offset for streams. Tables are always
 	// consumed from OffsetOldest.
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Offsets.CommitInterval = 100
 
 	// producer configuration
 	config.Producer.RequiredAcks = sarama.WaitForLocal

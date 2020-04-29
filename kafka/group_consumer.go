@@ -223,7 +223,7 @@ func (c *groupConsumer) waitForMessages() bool {
 				Partition: msg.Partition,
 				Offset:    msg.Offset,
 				Timestamp: msg.Timestamp,
-				Key:       string(msg.Key),
+				Key:       msg.Key,
 				Value:     msg.Value,
 				Header:    headers,
 			}:

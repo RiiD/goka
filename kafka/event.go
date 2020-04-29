@@ -50,12 +50,12 @@ type Message struct {
 	Timestamp time.Time
 	Header    map[string][]byte
 
-	Key   string
+	Key   []byte
 	Value []byte
 }
 
 func (m *Message) string() string {
-	return fmt.Sprintf("Message %s/%d:%d %s=%v", m.Topic, m.Partition, m.Offset, m.Key, m.Value)
+	return fmt.Sprintf("Message %s/%d:%d %v=%v", m.Topic, m.Partition, m.Offset, m.Key, m.Value)
 }
 
 // Error from kafka wrapped to be conform with the Event-Interface

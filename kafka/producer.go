@@ -11,7 +11,7 @@ import (
 // Producer abstracts the kafka producer
 type Producer interface {
 	// Emit sends a message to topic.
-	Emit(topic string, key string, value []byte) *Promise
+	Emit(topic string, key []byte, value []byte) *Promise
 	Close() error
 }
 
@@ -19,6 +19,8 @@ type producer struct {
 	producer sarama.AsyncProducer
 	wg       sync.WaitGroup
 }
+
+var _ Producer = &producer{}
 
 // NewProducer creates new kafka producer for passed brokers.
 func NewProducer(brokers []string, config *sarama.Config) (Producer, error) {
@@ -60,11 +62,11 @@ func (p *producer) Close() error {
 
 // Emit emits a key-value pair to topic and returns a Promise that
 // can be checked for errors asynchronously
-func (p *producer) Emit(topic string, key string, value []byte) *Promise {
+func (p *producer) Emit(topic string, key []byte, value []byte) *Promise {
 	promise := NewPromise()
 	p.producer.Input() <- &sarama.ProducerMessage{
 		Topic:    topic,
-		Key:      sarama.StringEncoder(key),
+		Key:      sarama.ByteEncoder(key),
 		Value:    sarama.ByteEncoder(value),
 		Metadata: promise,
 	}
