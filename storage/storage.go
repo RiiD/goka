@@ -10,8 +10,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-const (
-	offsetKey = "__offset"
+var (
+	offsetKey = []byte("__offset")
 )
 
 // Iterator provides iteration access to the stored values.
@@ -35,10 +35,10 @@ type Iterator interface {
 
 // Storage abstracts the interface for a persistent local storage
 type Storage interface {
-	Has(string) (bool, error)
-	Get(string) ([]byte, error)
-	Set(string, []byte) error
-	Delete(string) error
+	Has([]byte) (bool, error)
+	Get([]byte) ([]byte, error)
+	Set([]byte, []byte) error
+	Delete([]byte) error
 	SetOffset(value int64) error
 	GetOffset(defValue int64) (int64, error)
 	Iterator() (Iterator, error)
@@ -67,6 +67,8 @@ type storage struct {
 
 	currentOffset int64
 }
+
+var _ Storage = &storage{}
 
 // New creates a new Storage backed by LevelDB.
 func New(db *leveldb.DB) (Storage, error) {
@@ -115,18 +117,18 @@ func (s *storage) IteratorWithRange(start, limit []byte) (Iterator, error) {
 
 }
 
-func (s *storage) Has(key string) (bool, error) {
-	return s.store.Has([]byte(key), nil)
+func (s *storage) Has(key []byte) (bool, error) {
+	return s.store.Has(key, nil)
 }
 
-func (s *storage) Get(key string) ([]byte, error) {
-	if has, err := s.store.Has([]byte(key), nil); err != nil {
+func (s *storage) Get(key []byte) ([]byte, error) {
+	if has, err := s.store.Has(key, nil); err != nil {
 		return nil, fmt.Errorf("error checking for existence in leveldb (key %s): %v", key, err)
 	} else if !has {
 		return nil, nil
 	}
 
-	value, err := s.store.Get([]byte(key), nil)
+	value, err := s.store.Get(key, nil)
 	if err == leveldb.ErrNotFound {
 		return nil, nil
 	} else if err != nil {
@@ -153,8 +155,8 @@ func (s *storage) GetOffset(defValue int64) (int64, error) {
 	return value, nil
 }
 
-func (s *storage) Set(key string, value []byte) error {
-	if err := s.store.Put([]byte(key), value, nil); err != nil {
+func (s *storage) Set(key, value []byte) error {
+	if err := s.store.Put(key, value, nil); err != nil {
 		return fmt.Errorf("error setting to leveldb (key %s): %v", key, err)
 	}
 	return nil
@@ -168,8 +170,8 @@ func (s *storage) SetOffset(offset int64) error {
 	return s.Set(offsetKey, []byte(strconv.FormatInt(offset, 10)))
 }
 
-func (s *storage) Delete(key string) error {
-	if err := s.store.Delete([]byte(key), nil); err != nil {
+func (s *storage) Delete(key []byte) error {
+	if err := s.store.Delete(key, nil); err != nil {
 		return fmt.Errorf("error deleting from leveldb (key %s): %v", key, err)
 	}
 

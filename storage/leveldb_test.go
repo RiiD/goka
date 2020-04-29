@@ -9,13 +9,13 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var keys []string
+var keys [][]byte
 var numKeys = 100
 var numWrites = 200000
 
 func init() {
 	for i := 0; i < numKeys; i++ {
-		keys = append(keys, fmt.Sprintf("key-%d", i))
+		keys = append(keys, []byte(fmt.Sprintf("key-%d", i)))
 	}
 }
 

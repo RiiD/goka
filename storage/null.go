@@ -6,6 +6,8 @@ type Null struct {
 	recovered bool
 }
 
+var _ Storage = &Null{}
+
 // NewNull returns a new Null storage.
 func NewNull() Storage {
 	return new(Null)
@@ -22,22 +24,22 @@ func (n *Null) Recovered() bool {
 }
 
 // Has returns false as in key not found.
-func (n *Null) Has(key string) (bool, error) {
+func (n *Null) Has([]byte) (bool, error) {
 	return false, nil
 }
 
 // Get returns nil values.
-func (n *Null) Get(key string) ([]byte, error) {
+func (n *Null) Get([]byte) ([]byte, error) {
 	return nil, nil
 }
 
 // Set will do nothing and doesn't error.
-func (n *Null) Set(key string, val []byte) error {
+func (n *Null) Set([]byte, []byte) error {
 	return nil
 }
 
 // Delete does nothing and doesn't error.
-func (n *Null) Delete(string) error {
+func (n *Null) Delete([]byte) error {
 	return nil
 }
 

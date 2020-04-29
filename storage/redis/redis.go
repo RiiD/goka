@@ -1,23 +1,26 @@
 package redis
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/lovoo/goka/storage"
 
-	redis "gopkg.in/redis.v5"
+	"gopkg.in/redis.v5"
 )
 
-const (
-	offsetKey = "__offset"
+var (
+	offsetKey = []byte("__offset")
 )
 
 type redisStorage struct {
 	client *redis.Client
 	hash   string
 }
+
+var _ storage.Storage = &redisStorage{}
 
 // New creates a new Storage backed by Redis.
 func New(client *redis.Client, hash string) (storage.Storage, error) {
@@ -33,18 +36,18 @@ func New(client *redis.Client, hash string) (storage.Storage, error) {
 	}, nil
 }
 
-func (s *redisStorage) Has(key string) (bool, error) {
-	return s.client.HExists(s.hash, key).Result()
+func (s *redisStorage) Has(key []byte) (bool, error) {
+	return s.client.HExists(s.hash, string(key)).Result()
 }
 
-func (s *redisStorage) Get(key string) ([]byte, error) {
-	has, err := s.client.HExists(s.hash, key).Result()
+func (s *redisStorage) Get(key []byte) ([]byte, error) {
+	has, err := s.client.HExists(s.hash, string(key)).Result()
 	if err != nil {
 		return nil, fmt.Errorf("error checking for existence in redis (key %s): %v", key, err)
 	} else if !has {
 		return nil, nil
 	}
-	value, err := s.client.HGet(s.hash, key).Bytes()
+	value, err := s.client.HGet(s.hash, string(key)).Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("error getting from redis (key %s): %v", key, err)
 	}
@@ -67,8 +70,8 @@ func (s *redisStorage) GetOffset(defValue int64) (int64, error) {
 	return value, nil
 }
 
-func (s *redisStorage) Set(key string, value []byte) error {
-	err := s.client.HSet(s.hash, key, value).Err()
+func (s *redisStorage) Set(key, value []byte) error {
+	err := s.client.HSet(s.hash, string(key), value).Err()
 	if err != nil {
 		return fmt.Errorf("error setting to redis (key %s): %v", key, err)
 	}
@@ -79,8 +82,8 @@ func (s *redisStorage) SetOffset(offset int64) error {
 	return s.Set(offsetKey, []byte(strconv.FormatInt(offset, 10)))
 }
 
-func (s *redisStorage) Delete(key string) error {
-	return s.client.HDel(s.hash, key).Err()
+func (s *redisStorage) Delete(key []byte) error {
+	return s.client.HDel(s.hash, string(key)).Err()
 }
 
 func (s *redisStorage) Iterator() (storage.Iterator, error) {
@@ -100,7 +103,7 @@ func (s *redisStorage) Iterator() (storage.Iterator, error) {
 	}, nil
 }
 
-func (s *redisStorage) IteratorWithRange(start, limit []byte) (storage.Iterator, error) {
+func (s *redisStorage) IteratorWithRange(start, _ []byte) (storage.Iterator, error) {
 	var current uint64
 	var keys []string
 	var err error
@@ -146,7 +149,7 @@ func (i *redisIterator) exhausted() bool {
 
 func (i *redisIterator) Next() bool {
 	i.current++
-	if string(i.Key()) == offsetKey {
+	if bytes.Equal(i.Key(), offsetKey) {
 		i.current++
 	}
 	return !i.exhausted()
@@ -176,6 +179,6 @@ func (i *redisIterator) Release() {
 	i.current = uint64(len(i.keys))
 }
 
-func (i *redisIterator) Seek(key []byte) bool {
+func (i *redisIterator) Seek(_ []byte) bool {
 	return !i.exhausted()
 }

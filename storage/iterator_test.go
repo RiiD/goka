@@ -25,7 +25,7 @@ func TestIterator(t *testing.T) {
 	}
 
 	for k, v := range kv {
-		ensure.Nil(t, st.Set(k, []byte(v)))
+		ensure.Nil(t, st.Set([]byte(k), []byte(v)))
 	}
 
 	ensure.Nil(t, st.SetOffset(777))

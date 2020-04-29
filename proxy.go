@@ -95,6 +95,8 @@ type storageProxy struct {
 	closedOnce once
 }
 
+var _ storage.Storage = &storageProxy{}
+
 func (s *storageProxy) Open() error {
 	if s == nil {
 		return nil
