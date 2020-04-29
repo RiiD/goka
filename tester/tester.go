@@ -150,31 +150,31 @@ func (km *Tester) codecForTopic(topic string) goka.Codec {
 func (km *Tester) RegisterGroupGraph(gg *goka.GroupGraph) {
 	if gg.GroupTable() != nil {
 		km.getOrCreateQueue(gg.GroupTable().Topic()).expectSimpleConsumer()
-		km.registerCodec(gg.GroupTable().Topic(), gg.GroupTable().Codec())
+		km.registerCodec(gg.GroupTable().Topic(), gg.GroupTable().ValueCodec())
 	}
 
 	for _, input := range gg.InputStreams() {
 		km.getOrCreateQueue(input.Topic()).expectGroupConsumer()
-		km.registerCodec(input.Topic(), input.Codec())
+		km.registerCodec(input.Topic(), input.ValueCodec())
 	}
 
 	for _, output := range gg.OutputStreams() {
-		km.registerCodec(output.Topic(), output.Codec())
+		km.registerCodec(output.Topic(), output.ValueCodec())
 		km.getOrCreateQueue(output.Topic())
 	}
 	for _, join := range gg.JointTables() {
 		km.getOrCreateQueue(join.Topic()).expectSimpleConsumer()
-		km.registerCodec(join.Topic(), join.Codec())
+		km.registerCodec(join.Topic(), join.ValueCodec())
 	}
 
 	if loop := gg.LoopStream(); loop != nil {
 		km.getOrCreateQueue(loop.Topic()).expectGroupConsumer()
-		km.registerCodec(loop.Topic(), loop.Codec())
+		km.registerCodec(loop.Topic(), loop.ValueCodec())
 	}
 
 	for _, lookup := range gg.LookupTables() {
 		km.getOrCreateQueue(lookup.Topic()).expectSimpleConsumer()
-		km.registerCodec(lookup.Topic(), lookup.Codec())
+		km.registerCodec(lookup.Topic(), lookup.ValueCodec())
 	}
 
 }

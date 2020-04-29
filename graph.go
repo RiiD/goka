@@ -126,33 +126,33 @@ func DefineGroup(group Group, edges ...Edge) *GroupGraph {
 			for _, input := range e {
 				gg.validateInputTopic(input.Topic())
 				inputStr := input.(*inputStream)
-				gg.codecs[input.Topic()] = input.Codec()
+				gg.codecs[input.Topic()] = input.ValueCodec()
 				gg.callbacks[input.Topic()] = inputStr.cb
 				gg.inputStreams = append(gg.inputStreams, inputStr)
 			}
 		case *inputStream:
 			gg.validateInputTopic(e.Topic())
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.codecs[e.Topic()] = e.ValueCodec()
 			gg.callbacks[e.Topic()] = e.cb
 			gg.inputStreams = append(gg.inputStreams, e)
 		case *loopStream:
 			e.setGroup(group)
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.codecs[e.Topic()] = e.ValueCodec()
 			gg.callbacks[e.Topic()] = e.cb
 			gg.loopStream = append(gg.loopStream, e)
 		case *outputStream:
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.codecs[e.Topic()] = e.ValueCodec()
 			gg.outputStreams = append(gg.outputStreams, e)
 		case *inputTable:
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.codecs[e.Topic()] = e.ValueCodec()
 			gg.inputTables = append(gg.inputTables, e)
 			gg.joinCheck[e.Topic()] = true
 		case *crossTable:
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.codecs[e.Topic()] = e.ValueCodec()
 			gg.crossTables = append(gg.crossTables, e)
 		case *groupTable:
 			e.setGroup(group)
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.codecs[e.Topic()] = e.ValueCodec()
 			gg.groupTable = append(gg.groupTable, e)
 		}
 	}
@@ -202,7 +202,7 @@ func (gg *GroupGraph) Validate() error {
 type Edge interface {
 	String() string
 	Topic() string
-	Codec() Codec
+	ValueCodec() Codec
 }
 
 // Edges is a slice of edge objects.
@@ -222,6 +222,8 @@ type topicDef struct {
 	codec Codec
 }
 
+var _ Edge = &topicDef{}
+
 func (t *topicDef) Topic() string {
 	return t.name
 }
@@ -230,7 +232,7 @@ func (t *topicDef) String() string {
 	return fmt.Sprintf("%s/%T", t.name, t.codec)
 }
 
-func (t *topicDef) Codec() Codec {
+func (t *topicDef) ValueCodec() Codec {
 	return t.codec
 }
 
@@ -238,6 +240,8 @@ type inputStream struct {
 	*topicDef
 	cb ProcessCallback
 }
+
+var _ Edge = inputStream{}
 
 // Input represents an edge of an input stream topic. The edge
 // specifies the topic name, its codec and the ProcessorCallback used to
@@ -250,12 +254,14 @@ func Input(topic Stream, c Codec, cb ProcessCallback) Edge {
 
 type inputStreams Edges
 
+var _ Edge = inputStreams{}
+
 func (is inputStreams) String() string {
 	if is == nil {
 		return "empty input streams"
 	}
 
-	return fmt.Sprintf("input streams: %s/%T", is.Topic(), is.Codec())
+	return fmt.Sprintf("input streams: %s/%T", is.Topic(), is.ValueCodec())
 }
 
 func (is inputStreams) Topic() string {
@@ -270,11 +276,11 @@ func (is inputStreams) Topic() string {
 	return strings.Join(topics, ",")
 }
 
-func (is inputStreams) Codec() Codec {
+func (is inputStreams) ValueCodec() Codec {
 	if is == nil {
 		return nil
 	}
-	return is[0].Codec()
+	return is[0].ValueCodec()
 }
 
 // Inputs creates edges of multiple input streams sharing the same
@@ -292,6 +298,8 @@ func Inputs(topics Streams, c Codec, cb ProcessCallback) Edge {
 
 type loopStream inputStream
 
+var _ Edge = loopStream{}
+
 // Loop represents the edge of the loopback topic of the group. The edge
 // specifies the codec of the messages in the topic and ProcesCallback to
 // process the messages of the topic. Context.Loopback() is used to write
@@ -308,6 +316,8 @@ type inputTable struct {
 	*topicDef
 }
 
+var _ Edge = inputTable{}
+
 // Join represents an edge of a copartitioned, log-compacted table topic. The
 // edge specifies the topic name and the codec of the messages of the topic.
 // The group starts reading the topic from the oldest offset.
@@ -321,6 +331,8 @@ type crossTable struct {
 	*topicDef
 }
 
+var _ Edge = crossTable{}
+
 // Lookup represents an edge of a non-copartitioned, log-compacted table
 // topic. The edge specifies the topic name and the codec of the messages of
 // the topic.  The group starts reading the topic from the oldest offset.
@@ -333,6 +345,8 @@ func Lookup(topic Table, c Codec) Edge {
 type groupTable struct {
 	*topicDef
 }
+
+var _ Edge = groupTable{}
 
 // Persist represents the edge of the group table, which is log-compacted and
 // copartitioned with the input streams. This edge specifies the codec of the
@@ -350,6 +364,8 @@ func (t *groupTable) setGroup(group Group) {
 type outputStream struct {
 	*topicDef
 }
+
+var _ Edge = outputStream{}
 
 // Output represents an edge of an output stream topic. The edge
 // specifies the topic name and the codec of the messages of the topic.

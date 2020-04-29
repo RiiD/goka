@@ -253,7 +253,7 @@ func (ctx *cbContext) valueForKey(key string) (interface{}, error) {
 		return nil, nil
 	}
 
-	value, err := ctx.graph.GroupTable().Codec().Decode(data)
+	value, err := ctx.graph.GroupTable().ValueCodec().Decode(data)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding value: %v", err)
 	}
@@ -288,7 +288,7 @@ func (ctx *cbContext) setValueForKey(key string, value interface{}) error {
 		return fmt.Errorf("cannot set nil as value")
 	}
 
-	encodedValue, err := ctx.graph.GroupTable().Codec().Encode(value)
+	encodedValue, err := ctx.graph.GroupTable().ValueCodec().Encode(value)
 	if err != nil {
 		return fmt.Errorf("error encoding value: %v", err)
 	}

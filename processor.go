@@ -90,7 +90,7 @@ func NewProcessor(brokers []string, gg *GroupGraph, options ...ProcessorOption) 
 	// create views
 	views := make(map[string]*View)
 	for _, t := range gg.LookupTables() {
-		view, err := NewView(brokers, Table(t.Topic()), t.Codec(),
+		view, err := NewView(brokers, Table(t.Topic()), t.ValueCodec(),
 			WithViewLogger(opts.log),
 			WithViewHasher(opts.hasher),
 			WithViewPartitionChannelSize(opts.partitionChannelSize),
@@ -225,7 +225,7 @@ func (g *Processor) Get(key string) (interface{}, error) {
 	// since we don't know what the codec does, make copy of the object
 	data := make([]byte, len(val))
 	copy(data, val)
-	value, err := g.graph.GroupTable().Codec().Decode(data)
+	value, err := g.graph.GroupTable().ValueCodec().Decode(data)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding %s: %v", key, err)
 	}
