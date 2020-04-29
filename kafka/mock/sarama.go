@@ -16,6 +16,10 @@ type MockClient struct {
 	recorder *MockClientMockRecorder
 }
 
+func (m *MockClient) RefreshController() (*sarama.Broker, error) {
+	panic("implement me")
+}
+
 // MockClientMockRecorder is the mock recorder for MockClient
 type MockClientMockRecorder struct {
 	mock *MockClient
