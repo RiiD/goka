@@ -133,7 +133,7 @@ func (ctx *cbContext) Loopback(key string, value interface{}) {
 		ctx.Fail(errors.New("no loop topic configured"))
 	}
 
-	data, err := l.Codec().Encode(value)
+	data, err := l.ValueCodec().Encode(value)
 	if err != nil {
 		ctx.Fail(fmt.Errorf("error encoding message for key %s: %v", key, err))
 	}
