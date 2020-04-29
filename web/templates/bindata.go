@@ -287,14 +287,14 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"web/templates/common/base.go.html": webTemplatesCommonBaseGoHtml,
-	"web/templates/common/head.go.html": webTemplatesCommonHeadGoHtml,
-	"web/templates/common/menu.go.html": webTemplatesCommonMenuGoHtml,
+	"web/templates/common/base.go.html":     webTemplatesCommonBaseGoHtml,
+	"web/templates/common/head.go.html":     webTemplatesCommonHeadGoHtml,
+	"web/templates/common/menu.go.html":     webTemplatesCommonMenuGoHtml,
 	"web/templates/monitor/details.go.html": webTemplatesMonitorDetailsGoHtml,
-	"web/templates/monitor/index.go.html": webTemplatesMonitorIndexGoHtml,
-	"web/templates/monitor/menu.go.html": webTemplatesMonitorMenuGoHtml,
-	"web/templates/query/index.go.html": webTemplatesQueryIndexGoHtml,
-	"web/templates/index/index.go.html": webTemplatesIndexIndexGoHtml,
+	"web/templates/monitor/index.go.html":   webTemplatesMonitorIndexGoHtml,
+	"web/templates/monitor/menu.go.html":    webTemplatesMonitorMenuGoHtml,
+	"web/templates/query/index.go.html":     webTemplatesQueryIndexGoHtml,
+	"web/templates/index/index.go.html":     webTemplatesIndexIndexGoHtml,
 }
 
 // AssetDir returns the file names below a certain
@@ -336,6 +336,7 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"web": &bintree{nil, map[string]*bintree{
 		"templates": &bintree{nil, map[string]*bintree{
@@ -349,8 +350,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			}},
 			"monitor": &bintree{nil, map[string]*bintree{
 				"details.go.html": &bintree{webTemplatesMonitorDetailsGoHtml, map[string]*bintree{}},
-				"index.go.html": &bintree{webTemplatesMonitorIndexGoHtml, map[string]*bintree{}},
-				"menu.go.html": &bintree{webTemplatesMonitorMenuGoHtml, map[string]*bintree{}},
+				"index.go.html":   &bintree{webTemplatesMonitorIndexGoHtml, map[string]*bintree{}},
+				"menu.go.html":    &bintree{webTemplatesMonitorMenuGoHtml, map[string]*bintree{}},
 			}},
 			"query": &bintree{nil, map[string]*bintree{
 				"index.go.html": &bintree{webTemplatesQueryIndexGoHtml, map[string]*bintree{}},
@@ -405,4 +406,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
