@@ -12,21 +12,21 @@ import (
 func TestMemStorageDelete(t *testing.T) {
 	storage := NewMemory()
 
-	has, err := storage.Has("key-1")
+	has, err := storage.Has([]byte("key-1"))
 	test.AssertNil(t, err)
 	test.AssertFalse(t, has)
 
-	err = storage.Set("key-1", []byte("content-1"))
+	err = storage.Set([]byte("key-1"), []byte("content-1"))
 	test.AssertNil(t, err)
 
-	has, err = storage.Has("key-1")
+	has, err = storage.Has([]byte("key-1"))
 	test.AssertNil(t, err)
 	test.AssertTrue(t, has)
 
-	err = storage.Delete("key-1")
+	err = storage.Delete([]byte("key-1"))
 	test.AssertNil(t, err)
 
-	has, err = storage.Has("key-1")
+	has, err = storage.Has([]byte("key-1"))
 	test.AssertNil(t, err)
 	test.AssertFalse(t, has)
 }
@@ -44,7 +44,7 @@ func TestMemIter(t *testing.T) {
 
 	storage.Set(offsetKey, []byte("not-returned"))
 	for k, v := range kv {
-		storage.Set(k, []byte(v))
+		storage.Set([]byte(k), []byte(v))
 	}
 
 	// released iterator should be immediately exhausted
@@ -94,30 +94,30 @@ func TestGetHas(t *testing.T) {
 		hasKey bool
 	)
 
-	hasKey, err = storage.Has("test-key")
+	hasKey, err = storage.Has([]byte("test-key"))
 	test.AssertNil(t, err)
 	test.AssertFalse(t, hasKey)
 
-	value, err := storage.Get("test-key")
+	value, err := storage.Get([]byte("test-key"))
 	test.AssertTrue(t, value == nil)
 	test.AssertNil(t, err)
 
-	err = storage.Set("test-key", []byte("test"))
+	err = storage.Set([]byte("test-key"), []byte("test"))
 	test.AssertNil(t, err)
 
-	hasKey, err = storage.Has("test-key")
+	hasKey, err = storage.Has([]byte("test-key"))
 	test.AssertNil(t, err)
 	test.AssertTrue(t, hasKey)
 
-	value, err = storage.Get("test-key")
+	value, err = storage.Get([]byte("test-key"))
 	test.AssertNil(t, err)
 	test.AssertEqual(t, value, []byte("test"))
 
-	hasKey, err = storage.Has("nil-value")
+	hasKey, err = storage.Has([]byte("nil-value"))
 	test.AssertNil(t, err)
 	test.AssertFalse(t, hasKey)
 
-	err = storage.Set("nil-value", nil)
+	err = storage.Set([]byte("test-key"), nil)
 	test.AssertNotNil(t, err)
 }
 
@@ -136,32 +136,32 @@ func TestSetGet(t *testing.T) {
 	storage, err := New(db)
 	test.AssertNil(t, err)
 
-	hasKey, err = storage.Has("example1")
+	hasKey, err = storage.Has([]byte("example1"))
 	test.AssertNil(t, err)
 	test.AssertFalse(t, hasKey)
 
-	value, err := storage.Get("example1")
+	value, err := storage.Get([]byte("example1"))
 	test.AssertTrue(t, value == nil)
 	test.AssertNil(t, err)
 
-	err = storage.Set("example1", []byte("example-message"))
+	err = storage.Set([]byte("example1"), []byte("example-message"))
 	test.AssertNil(t, err)
 
-	hasKey, err = storage.Has("example1")
+	hasKey, err = storage.Has([]byte("example1"))
 	test.AssertNil(t, err)
 	test.AssertTrue(t, hasKey)
 
-	value, err = storage.Get("example1")
+	value, err = storage.Get([]byte("example1"))
 	test.AssertNil(t, err)
 
-	test.AssertNil(t, storage.Delete("example1"))
-	hasKey, err = storage.Has("example1")
+	test.AssertNil(t, storage.Delete([]byte("example1")))
+	hasKey, err = storage.Has([]byte("example1"))
 	test.AssertNil(t, err)
 	test.AssertFalse(t, hasKey)
 
 	// test iteration
-	test.AssertNil(t, storage.Set("key1", []byte("value1")))
-	test.AssertNil(t, storage.Set("key2", []byte("value2")))
+	test.AssertNil(t, storage.Set([]byte("key1"), []byte("value1")))
+	test.AssertNil(t, storage.Set([]byte("key2"), []byte("value2")))
 	iter, err := storage.Iterator()
 	test.AssertNil(t, err)
 	defer iter.Release()

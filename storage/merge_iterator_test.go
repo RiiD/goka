@@ -82,13 +82,13 @@ func SetState(t *testing.T, st Storage, offset int64, state map[string]string) {
 	defer iter.Release()
 
 	for iter.Next() {
-		if err := st.Delete(string(iter.Key())); err != nil {
+		if err := st.Delete(iter.Key()); err != nil {
 			t.Fatalf("error deleting previous state: %v", err)
 		}
 	}
 
 	for key, value := range state {
-		if err := st.Set(key, []byte(value)); err != nil {
+		if err := st.Set([]byte(key), []byte(value)); err != nil {
 			t.Fatalf("error setting value: %v", err)
 		}
 	}

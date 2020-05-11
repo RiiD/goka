@@ -20,7 +20,7 @@ func (i *memiter) exhausted() bool {
 
 func (i *memiter) Next() bool {
 	i.current++
-	if string(i.Key()) == offsetKey {
+	if bytes.Equal(i.Key(), offsetKey) {
 		i.current++
 	}
 	return !i.exhausted()
@@ -72,6 +72,8 @@ type memory struct {
 	recovered bool
 }
 
+var _ Storage = &memory{}
+
 // NewMemory returns a new in-memory storage.
 func NewMemory() Storage {
 	return &memory{
@@ -80,26 +82,26 @@ func NewMemory() Storage {
 	}
 }
 
-func (m *memory) Has(key string) (bool, error) {
-	_, has := m.storage[key]
+func (m *memory) Has(key []byte) (bool, error) {
+	_, has := m.storage[string(key)]
 	return has, nil
 }
 
-func (m *memory) Get(key string) ([]byte, error) {
-	value, _ := m.storage[key]
+func (m *memory) Get(key []byte) ([]byte, error) {
+	value, _ := m.storage[string(key)]
 	return value, nil
 }
 
-func (m *memory) Set(key string, value []byte) error {
+func (m *memory) Set(key, value []byte) error {
 	if value == nil {
 		return fmt.Errorf("cannot write nil value")
 	}
-	m.storage[key] = value
+	m.storage[string(key)] = value
 	return nil
 }
 
-func (m *memory) Delete(key string) error {
-	delete(m.storage, key)
+func (m *memory) Delete(key []byte) error {
+	delete(m.storage, string(key))
 	return nil
 }
 

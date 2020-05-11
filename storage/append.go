@@ -14,6 +14,8 @@ type file struct {
 	bytesWritten int64
 }
 
+var _ Storage = &file{}
+
 // NewFile retuns a new on-disk storage.
 func NewFile(path string, part int32) (Storage, error) {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
@@ -37,15 +39,15 @@ func (f *file) MarkRecovered() error {
 	return nil
 }
 
-func (f *file) Has(key string) (bool, error) {
+func (f *file) Has([]byte) (bool, error) {
 	return false, nil
 }
 
-func (f *file) Get(key string) ([]byte, error) {
+func (f *file) Get([]byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (f *file) Set(key string, val []byte) error {
+func (f *file) Set(_, val []byte) error {
 	num, err := f.file.Write(val)
 	if err != nil {
 		return err
@@ -60,7 +62,7 @@ func (f *file) Set(key string, val []byte) error {
 	return nil
 }
 
-func (f *file) Delete(string) error {
+func (f *file) Delete([]byte) error {
 	return nil
 }
 
@@ -68,7 +70,7 @@ func (f *file) GetOffset(def int64) (int64, error) {
 	return def, nil
 }
 
-func (f *file) SetOffset(val int64) error {
+func (f *file) SetOffset(int64) error {
 	return nil
 }
 
@@ -76,7 +78,7 @@ func (f *file) Iterator() (Iterator, error) {
 	return new(NullIter), nil
 }
 
-func (f *file) IteratorWithRange(start, limit []byte) (Iterator, error) {
+func (f *file) IteratorWithRange(_, _ []byte) (Iterator, error) {
 	return new(NullIter), nil
 }
 

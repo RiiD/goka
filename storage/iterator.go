@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	ldbiter "github.com/syndtr/goleveldb/leveldb/iterator"
 )
@@ -14,7 +16,7 @@ type iterator struct {
 
 func (i *iterator) Next() bool {
 	next := i.iter.Next()
-	if string(i.iter.Key()) == offsetKey {
+	if bytes.Equal(i.iter.Key(), offsetKey) {
 		next = i.iter.Next()
 	}
 
