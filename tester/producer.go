@@ -6,7 +6,7 @@ import (
 
 // emitHandler abstracts a function that allows to overwrite kafkamock's Emit function to
 // simulate producer errors
-type emitHandler func(topic string, key string, value []byte) *goka.Promise
+type emitHandler func(topic string, key, value []byte) *goka.Promise
 
 type producerMock struct {
 	emitter emitHandler
@@ -21,7 +21,7 @@ func newProducerMock(emitter emitHandler) *producerMock {
 // Emit emits messages to arbitrary topics.
 // The mock simply forwards the emit to the KafkaMock which takes care of queueing calls
 // to handled topics or putting the emitted messages in the emitted-messages-list
-func (p *producerMock) Emit(topic string, key string, value []byte) *goka.Promise {
+func (p *producerMock) Emit(topic string, key, value []byte) *goka.Promise {
 	return p.emitter(topic, key, value)
 }
 
@@ -39,8 +39,10 @@ type flushingProducer struct {
 	producer goka.Producer
 }
 
+var _ goka.Producer = &flushingProducer{}
+
 // Emit using the underlying producer
-func (e *flushingProducer) Emit(topic string, key string, value []byte) *goka.Promise {
+func (e *flushingProducer) Emit(topic string, key, value []byte) *goka.Promise {
 	prom := e.producer.Emit(topic, key, value)
 	e.tester.waitForClients()
 	return prom

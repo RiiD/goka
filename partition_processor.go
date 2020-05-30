@@ -505,7 +505,7 @@ func (pp *PartitionProcessor) processMessage(ctx context.Context, wg *sync.WaitG
 		m = nil
 	default:
 		// get stream subcription
-		codec := pp.graph.codec(msg.Topic)
+		codec := pp.graph.valueCodec(msg.Topic)
 		if codec == nil {
 			return fmt.Errorf("cannot handle topic %s", msg.Topic)
 		}

@@ -98,7 +98,9 @@ func NewProcessor(brokers []string, gg *GroupGraph, options ...ProcessorOption) 
 	// create views
 	lookupTables := make(map[string]*View)
 	for _, t := range gg.LookupTables() {
-		view, err := NewView(brokers, Table(t.Topic()), t.Codec(),
+		view, err := NewViewWithCustomKeyCodec(brokers, Table(t.Topic()),
+			t.KeyCodec(),
+			t.ValueCodec(),
 			WithViewLogger(opts.log),
 			WithViewHasher(opts.hasher),
 			WithViewClientID(opts.clientID),
@@ -151,19 +153,24 @@ func (g *Processor) isStateless() bool {
 // Get can be called by multiple goroutines concurrently.
 // Get can be only used with stateful processors (ie, when group table is
 // enabled) and after Recovered returns true.
-func (g *Processor) Get(key string) (interface{}, error) {
+func (g *Processor) Get(key interface{}) (interface{}, error) {
 	if g.isStateless() {
 		return nil, fmt.Errorf("can't get a value from stateless processor")
 	}
 
+	keyBytes, err := g.graph.GroupTable().KeyCodec().Encode(key)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding key for key %v: %v", key, err)
+	}
+
 	// find partition where key is located
-	s, err := g.find(key)
+	s, err := g.find(keyBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	// get key and return
-	val, err := s.Get(key)
+	val, err := s.Get(keyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error getting %s: %v", key, err)
 	} else if val == nil {
@@ -174,14 +181,14 @@ func (g *Processor) Get(key string) (interface{}, error) {
 	// since we don't know what the codec does, make copy of the object
 	data := make([]byte, len(val))
 	copy(data, val)
-	value, err := g.graph.GroupTable().Codec().Decode(data)
+	value, err := g.graph.GroupTable().ValueCodec().Decode(data)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding %s: %v", key, err)
+		return nil, fmt.Errorf("error decoding value for key %v: %v", key, err)
 	}
 	return value, nil
 }
 
-func (g *Processor) find(key string) (storage.Storage, error) {
+func (g *Processor) find(key []byte) (storage.Storage, error) {
 	p, err := g.hash(key)
 	if err != nil {
 		return nil, err
@@ -194,13 +201,13 @@ func (g *Processor) find(key string) (storage.Storage, error) {
 	return g.partitions[p].table.st, nil
 }
 
-func (g *Processor) hash(key string) (int32, error) {
+func (g *Processor) hash(key []byte) (int32, error) {
 	// create a new hasher every time. Alternative would be to store the hash in
 	// view and every time reset the hasher (ie, hasher.Reset()). But that would
 	// also require us to protect the access of the hasher with a mutex.
 	hasher := g.opts.hasher()
 
-	_, err := hasher.Write([]byte(key))
+	_, err := hasher.Write(key)
 	if err != nil {
 		return -1, err
 	}

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/lovoo/goka/codec"
 )
 
 var (
@@ -40,8 +42,9 @@ type GroupGraph struct {
 	loopStream    []Edge
 	groupTable    []Edge
 
-	codecs    map[string]Codec
-	callbacks map[string]ProcessCallback
+	valueCodecs map[string]Codec
+	keyCodecs   map[string]Codec
+	callbacks   map[string]ProcessCallback
 
 	outputStreamTopics map[Stream]struct{}
 
@@ -107,8 +110,12 @@ func (gg *GroupGraph) copartitioned() Edges {
 	return append(gg.inputStreams, gg.inputTables...)
 }
 
-func (gg *GroupGraph) codec(topic string) Codec {
-	return gg.codecs[topic]
+func (gg *GroupGraph) valueCodec(topic string) Codec {
+	return gg.valueCodecs[topic]
+}
+
+func (gg *GroupGraph) keyCodec(topic string) Codec {
+	return gg.keyCodecs[topic]
 }
 
 func (gg *GroupGraph) callback(topic string) ProcessCallback {
@@ -123,7 +130,8 @@ func (gg *GroupGraph) joint(topic string) bool {
 // edges.
 func DefineGroup(group Group, edges ...Edge) *GroupGraph {
 	gg := GroupGraph{group: string(group),
-		codecs:             make(map[string]Codec),
+		valueCodecs:        make(map[string]Codec),
+		keyCodecs:          make(map[string]Codec),
 		callbacks:          make(map[string]ProcessCallback),
 		joinCheck:          make(map[string]bool),
 		outputStreamTopics: make(map[Stream]struct{}),
@@ -135,34 +143,41 @@ func DefineGroup(group Group, edges ...Edge) *GroupGraph {
 			for _, input := range e {
 				gg.validateInputTopic(input.Topic())
 				inputStr := input.(*inputStream)
-				gg.codecs[input.Topic()] = input.Codec()
+				gg.valueCodecs[input.Topic()] = input.ValueCodec()
+				gg.keyCodecs[input.Topic()] = input.KeyCodec()
 				gg.callbacks[input.Topic()] = inputStr.cb
 				gg.inputStreams = append(gg.inputStreams, inputStr)
 			}
 		case *inputStream:
 			gg.validateInputTopic(e.Topic())
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.callbacks[e.Topic()] = e.cb
 			gg.inputStreams = append(gg.inputStreams, e)
 		case *loopStream:
 			e.setGroup(group)
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.callbacks[e.Topic()] = e.cb
 			gg.loopStream = append(gg.loopStream, e)
 		case *outputStream:
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.outputStreams = append(gg.outputStreams, e)
 			gg.outputStreamTopics[Stream(e.Topic())] = struct{}{}
 		case *inputTable:
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.inputTables = append(gg.inputTables, e)
 			gg.joinCheck[e.Topic()] = true
 		case *crossTable:
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.crossTables = append(gg.crossTables, e)
 		case *groupTable:
 			e.setGroup(group)
-			gg.codecs[e.Topic()] = e.Codec()
+			gg.valueCodecs[e.Topic()] = e.ValueCodec()
+			gg.keyCodecs[e.Topic()] = e.KeyCodec()
 			gg.groupTable = append(gg.groupTable, e)
 		}
 	}
@@ -213,7 +228,8 @@ func (gg *GroupGraph) Validate() error {
 type Edge interface {
 	String() string
 	Topic() string
-	Codec() Codec
+	ValueCodec() Codec
+	KeyCodec() Codec
 }
 
 // Edges is a slice of edge objects.
@@ -229,20 +245,27 @@ func (e Edges) Topics() []string {
 }
 
 type topicDef struct {
-	name  string
-	codec Codec
+	name       string
+	valueCodec Codec
+	keyCodec   Codec
 }
+
+var _ Edge = &topicDef{}
 
 func (t *topicDef) Topic() string {
 	return t.name
 }
 
 func (t *topicDef) String() string {
-	return fmt.Sprintf("%s/%T", t.name, t.codec)
+	return fmt.Sprintf("%s/%T:%T", t.name, t.keyCodec, t.valueCodec)
 }
 
-func (t *topicDef) Codec() Codec {
-	return t.codec
+func (t *topicDef) ValueCodec() Codec {
+	return t.valueCodec
+}
+
+func (t *topicDef) KeyCodec() Codec {
+	return t.keyCodec
 }
 
 type inputStream struct {
@@ -250,23 +273,36 @@ type inputStream struct {
 	cb ProcessCallback
 }
 
+var _ Edge = inputStream{}
+
 // Input represents an edge of an input stream topic. The edge
 // specifies the topic name, its codec and the ProcessorCallback used to
 // process it. The topic has to be copartitioned with any other input stream of
 // the group and with the group table.
 // The group starts reading the topic from the newest offset.
-func Input(topic Stream, c Codec, cb ProcessCallback) Edge {
-	return &inputStream{&topicDef{string(topic), c}, cb}
+func Input(topic Stream, valueCodec Codec, cb ProcessCallback) Edge {
+	return InputWithCustomKeyCodec(topic, new(codec.String), valueCodec, cb)
+}
+
+// InputWithCustomKeyCodec same as Input execpt allows to specify custom key codec.
+func InputWithCustomKeyCodec(topic Stream, keyCodec, valueCodec Codec, cb ProcessCallback) Edge {
+	return &inputStream{&topicDef{
+		name:       string(topic),
+		keyCodec:   keyCodec,
+		valueCodec: valueCodec,
+	}, cb}
 }
 
 type inputStreams Edges
+
+var _ Edge = inputStreams{}
 
 func (is inputStreams) String() string {
 	if is == nil {
 		return "empty input streams"
 	}
 
-	return fmt.Sprintf("input streams: %s/%T", is.Topic(), is.Codec())
+	return fmt.Sprintf("input streams: %s/%T:%T", is.Topic(), is.KeyCodec(), is.ValueCodec())
 }
 
 func (is inputStreams) Topic() string {
@@ -281,34 +317,56 @@ func (is inputStreams) Topic() string {
 	return strings.Join(topics, ",")
 }
 
-func (is inputStreams) Codec() Codec {
+func (is inputStreams) ValueCodec() Codec {
 	if is == nil {
 		return nil
 	}
-	return is[0].Codec()
+	return is[0].ValueCodec()
+}
+
+func (is inputStreams) KeyCodec() Codec {
+	if is == nil {
+		return nil
+	}
+	return is[0].KeyCodec()
 }
 
 // Inputs creates edges of multiple input streams sharing the same
 // codec and callback.
-func Inputs(topics Streams, c Codec, cb ProcessCallback) Edge {
+func Inputs(topics Streams, valueCodec Codec, cb ProcessCallback) Edge {
+	return InputsWithCustomKeyCodec(topics, new(codec.String), valueCodec, cb)
+}
+
+// InputsWithCustomKeyCodec same as Inputs except allows to specify custom key codec.
+func InputsWithCustomKeyCodec(topics Streams, keyCodec, valueCodec Codec, cb ProcessCallback) Edge {
 	if len(topics) == 0 {
 		return nil
 	}
 	var edges Edges
 	for _, topic := range topics {
-		edges = append(edges, Input(topic, c, cb))
+		edges = append(edges, InputWithCustomKeyCodec(topic, keyCodec, valueCodec, cb))
 	}
 	return inputStreams(edges)
 }
 
 type loopStream inputStream
 
+var _ Edge = loopStream{}
+
 // Loop represents the edge of the loopback topic of the group. The edge
 // specifies the codec of the messages in the topic and ProcesCallback to
 // process the messages of the topic. Context.Loopback() is used to write
 // messages into this topic from any callback of the group.
-func Loop(c Codec, cb ProcessCallback) Edge {
-	return &loopStream{&topicDef{codec: c}, cb}
+func Loop(valueCodec Codec, cb ProcessCallback) Edge {
+	return LoopWithCustomKeyCodec(new(codec.String), valueCodec, cb)
+}
+
+// LoopWithCustomKeyCodec same as Loop except allows to specify custom key codec.
+func LoopWithCustomKeyCodec(keyCodec, valueCodec Codec, cb ProcessCallback) Edge {
+	return &loopStream{&topicDef{
+		valueCodec: valueCodec,
+		keyCodec:   keyCodec,
+	}, cb}
 }
 
 func (s *loopStream) setGroup(group Group) {
@@ -319,31 +377,55 @@ type inputTable struct {
 	*topicDef
 }
 
+var _ Edge = inputTable{}
+
 // Join represents an edge of a copartitioned, log-compacted table topic. The
 // edge specifies the topic name and the codec of the messages of the topic.
 // The group starts reading the topic from the oldest offset.
 // The processing of input streams is blocked until all partitions of the table
 // are recovered.
-func Join(topic Table, c Codec) Edge {
-	return &inputTable{&topicDef{string(topic), c}}
+func Join(topic Table, valueCodec Codec) Edge {
+	return JoinWithCustomKeyCodec(topic, new(codec.String), valueCodec)
+}
+
+// JoinWithCustomKeyCodec same as Join except allows to specify custom key codec.
+func JoinWithCustomKeyCodec(topic Table, keyCodec, valueCodec Codec) Edge {
+	return &inputTable{&topicDef{
+		name:       string(topic),
+		valueCodec: valueCodec,
+		keyCodec:   keyCodec,
+	}}
 }
 
 type crossTable struct {
 	*topicDef
 }
 
+var _ Edge = crossTable{}
+
 // Lookup represents an edge of a non-copartitioned, log-compacted table
 // topic. The edge specifies the topic name and the codec of the messages of
 // the topic.  The group starts reading the topic from the oldest offset.
 // The processing of input streams is blocked until the table is fully
 // recovered.
-func Lookup(topic Table, c Codec) Edge {
-	return &crossTable{&topicDef{string(topic), c}}
+func Lookup(topic Table, valueCodec Codec) Edge {
+	return LookupWithCustomKeyCodec(topic, new(codec.String), valueCodec)
+}
+
+// LookupWithCustomKeyCodec same as Lookup except allows to specify custom key codec
+func LookupWithCustomKeyCodec(topic Table, keyCodec, valueCodec Codec) Edge {
+	return &crossTable{&topicDef{
+		name:       string(topic),
+		valueCodec: valueCodec,
+		keyCodec:   keyCodec,
+	}}
 }
 
 type groupTable struct {
 	*topicDef
 }
+
+var _ Edge = groupTable{}
 
 // Persist represents the edge of the group table, which is log-compacted and
 // copartitioned with the input streams.
@@ -356,8 +438,17 @@ type groupTable struct {
 // table are recovered.
 //
 // The topic name is derived from the group name by appending "-table".
-func Persist(c Codec) Edge {
-	return &groupTable{&topicDef{codec: c}}
+func Persist(valueCodec Codec) Edge {
+	return PersistWithCustomKeyCodec(new(codec.String), valueCodec)
+}
+
+func PersistWithCustomKeyCodec(keyCodec, valueCodec Codec) Edge {
+	return &groupTable{
+		topicDef: &topicDef{
+			keyCodec:   keyCodec,
+			valueCodec: valueCodec,
+		},
+	}
 }
 
 func (t *groupTable) setGroup(group Group) {
@@ -368,13 +459,24 @@ type outputStream struct {
 	*topicDef
 }
 
+var _ Edge = outputStream{}
+
 // Output represents an edge of an output stream topic. The edge
 // specifies the topic name and the codec of the messages of the topic.
 // Context.Emit() only emits messages into Output edges defined in the group
 // graph.
 // The topic does not have to be copartitioned with the input streams.
-func Output(topic Stream, c Codec) Edge {
-	return &outputStream{&topicDef{string(topic), c}}
+func Output(topic Stream, valueCodec Codec) Edge {
+	return OutputWithCustomKeyCodec(topic, new(codec.String), valueCodec)
+}
+
+// OutputWithCustomKeyCodec same as Output except allows to specify custom key codec
+func OutputWithCustomKeyCodec(topic Stream, keyCodec, valueCodec Codec) Edge {
+	return &outputStream{&topicDef{
+		name:       string(topic),
+		valueCodec: valueCodec,
+		keyCodec:   keyCodec,
+	}}
 }
 
 // GroupTable returns the name of the group table of group.

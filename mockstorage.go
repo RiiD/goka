@@ -48,7 +48,7 @@ func (mr *MockStorageMockRecorder) Close() *gomock.Call {
 }
 
 // Delete mocks base method
-func (m *MockStorage) Delete(arg0 string) error {
+func (m *MockStorage) Delete(arg0 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", arg0)
 	ret0, _ := ret[0].(error)
@@ -62,7 +62,7 @@ func (mr *MockStorageMockRecorder) Delete(arg0 interface{}) *gomock.Call {
 }
 
 // Get mocks base method
-func (m *MockStorage) Get(arg0 string) ([]byte, error) {
+func (m *MockStorage) Get(arg0 []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0)
 	ret0, _ := ret[0].([]byte)
@@ -92,7 +92,7 @@ func (mr *MockStorageMockRecorder) GetOffset(arg0 interface{}) *gomock.Call {
 }
 
 // Has mocks base method
-func (m *MockStorage) Has(arg0 string) (bool, error) {
+func (m *MockStorage) Has(arg0 []byte) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Has", arg0)
 	ret0, _ := ret[0].(bool)
@@ -164,22 +164,8 @@ func (mr *MockStorageMockRecorder) Open() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Open", reflect.TypeOf((*MockStorage)(nil).Open))
 }
 
-// Recovered mocks base method
-func (m *MockStorage) Recovered() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Recovered")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// Recovered indicates an expected call of Recovered
-func (mr *MockStorageMockRecorder) Recovered() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Recovered", reflect.TypeOf((*MockStorage)(nil).Recovered))
-}
-
 // Set mocks base method
-func (m *MockStorage) Set(arg0 string, arg1 []byte) error {
+func (m *MockStorage) Set(arg0, arg1 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Set", arg0, arg1)
 	ret0, _ := ret[0].(error)

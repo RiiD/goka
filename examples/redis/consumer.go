@@ -22,7 +22,7 @@ func Consume(pub Publisher, brokers []string, group string, stream string, store
 	input := goka.Input(goka.Stream(stream), codec, func(ctx goka.Context, msg interface{}) {
 		event, ok := msg.(*Event)
 		if ok {
-			pub.Publish(context.Background(), ctx.Key(), event)
+			pub.Publish(context.Background(), ctx.Key().(string), event)
 		}
 	})
 	graph := goka.DefineGroup(goka.Group(group), input, goka.Persist(codec))

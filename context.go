@@ -11,7 +11,7 @@ import (
 	"github.com/lovoo/goka/multierr"
 )
 
-type emitter func(topic string, key string, value []byte) *Promise
+type emitter func(topic string, key, value []byte) *Promise
 
 // Context provides access to the processor's table and emit capabilities to
 // arbitrary topics in kafka.
@@ -43,7 +43,7 @@ type Context interface {
 	Topic() Stream
 
 	// Key returns the key of the input message.
-	Key() string
+	Key() interface{}
 
 	// Partition returns the partition of the input message.
 	Partition() int32
@@ -95,14 +95,14 @@ type Context interface {
 	// This method might panic to initiate an immediate shutdown of the processor
 	// to maintain data integrity. Do not recover from that panic or
 	// the processor might deadlock.
-	Lookup(topic Table, key string) interface{}
+	Lookup(topic Table, key interface{}) interface{}
 
 	// Emit asynchronously writes a message into a topic.
 	//
 	// This method might panic to initiate an immediate shutdown of the processor
 	// to maintain data integrity. Do not recover from that panic or
 	// the processor might deadlock.
-	Emit(topic Stream, key string, value interface{})
+	Emit(topic Stream, key interface{}, value interface{})
 
 	// Loopback asynchronously sends a message to another key of the group
 	// table. Value passed to loopback is encoded via the codec given in the
@@ -111,7 +111,7 @@ type Context interface {
 	// This method might panic to initiate an immediate shutdown of the processor
 	// to maintain data integrity. Do not recover from that panic or
 	// the processor might deadlock.
-	Loopback(key string, value interface{})
+	Loopback(key interface{}, value interface{})
 
 	// Fail stops execution and shuts down the processor
 	// The callback is stopped immediately by panicking. Do not recover from that panic or
@@ -160,7 +160,7 @@ type cbContext struct {
 }
 
 // Emit sends a message asynchronously to a topic.
-func (ctx *cbContext) Emit(topic Stream, key string, value interface{}) {
+func (ctx *cbContext) Emit(topic Stream, key interface{}, value interface{}) {
 	if topic == "" {
 		ctx.Fail(errors.New("cannot emit to empty topic"))
 	}
@@ -174,39 +174,57 @@ func (ctx *cbContext) Emit(topic Stream, key string, value interface{}) {
 		ctx.Fail(fmt.Errorf("topic %s is not configured for output. Did you specify goka.Output(..) when defining the processor?", topic))
 	}
 
-	c := ctx.graph.codec(string(topic))
-	if c == nil {
-		ctx.Fail(fmt.Errorf("no codec for topic %s", topic))
+	valueCodec := ctx.graph.valueCodec(string(topic))
+	if valueCodec == nil {
+		ctx.Fail(ErrNoValueCodec)
+		return
+	}
+
+	keyCodec := ctx.graph.keyCodec(string(topic))
+	if keyCodec == nil {
+		ctx.Fail(ErrNoKeyCodec)
+		return
+	}
+
+	var err error
+	keyBytes, err := keyCodec.Encode(key)
+	if err != nil {
+		ctx.Fail(fmt.Errorf("error encoding message key for topic %s: %w", topic, err))
 	}
 
 	var data []byte
 	if value != nil {
 		var err error
-		data, err = c.Encode(value)
+		data, err = valueCodec.Encode(value)
 		if err != nil {
-			ctx.Fail(fmt.Errorf("error encoding message for topic %s: %v", topic, err))
+			ctx.Fail(fmt.Errorf("error encoding message value for topic %s: %w", topic, err))
 		}
 	}
 
-	ctx.emit(string(topic), key, data)
+	ctx.emit(string(topic), keyBytes, data)
 }
 
 // Loopback sends a message to another key of the processor.
-func (ctx *cbContext) Loopback(key string, value interface{}) {
+func (ctx *cbContext) Loopback(key interface{}, value interface{}) {
 	l := ctx.graph.LoopStream()
 	if l == nil {
 		ctx.Fail(errors.New("no loop topic configured"))
 	}
 
-	data, err := l.Codec().Encode(value)
+	data, err := l.ValueCodec().Encode(value)
 	if err != nil {
-		ctx.Fail(fmt.Errorf("error encoding message for key %s: %v", key, err))
+		ctx.Fail(fmt.Errorf("error encoding message value for key %s: %w", key, err))
 	}
 
-	ctx.emit(l.Topic(), key, data)
+	keyBytes, err := l.KeyCodec().Encode(key)
+	if err != nil {
+		ctx.Fail(fmt.Errorf("error encoding message key for key %s: %w", key, err))
+	}
+
+	ctx.emit(l.Topic(), keyBytes, data)
 }
 
-func (ctx *cbContext) emit(topic string, key string, value []byte) {
+func (ctx *cbContext) emit(topic string, key []byte, value []byte) {
 	ctx.counters.emits++
 	ctx.emitter(topic, key, value).Then(func(err error) {
 		if err != nil {
@@ -218,14 +236,14 @@ func (ctx *cbContext) emit(topic string, key string, value []byte) {
 }
 
 func (ctx *cbContext) Delete() {
-	if err := ctx.deleteKey(ctx.Key()); err != nil {
+	if err := ctx.deleteKey(ctx.msg.Key); err != nil {
 		ctx.Fail(err)
 	}
 }
 
 // Value returns the value of the key in the group table.
 func (ctx *cbContext) Value() interface{} {
-	val, err := ctx.valueForKey(ctx.Key())
+	val, err := ctx.valueForKey(ctx.msg.Key)
 	if err != nil {
 		ctx.Fail(err)
 	}
@@ -234,7 +252,7 @@ func (ctx *cbContext) Value() interface{} {
 
 // SetValue updates the value of the key in the group table.
 func (ctx *cbContext) SetValue(value interface{}) {
-	if err := ctx.setValueForKey(ctx.Key(), value); err != nil {
+	if err := ctx.setValueForKey(ctx.msg.Key, value); err != nil {
 		ctx.Fail(err)
 	}
 }
@@ -244,8 +262,18 @@ func (ctx *cbContext) Timestamp() time.Time {
 	return ctx.msg.Timestamp
 }
 
-func (ctx *cbContext) Key() string {
-	return string(ctx.msg.Key)
+func (ctx *cbContext) Key() interface{} {
+	keyCodec := ctx.graph.keyCodec(ctx.msg.Topic)
+	if keyCodec == nil {
+		ctx.Fail(fmt.Errorf("no key codec for topic %s", ctx.msg.Topic))
+	}
+
+	key, err := keyCodec.Decode(ctx.msg.Key)
+	if err != nil {
+		ctx.Fail(fmt.Errorf("error decoding key %v: %w", ctx.msg.Key, err))
+	}
+
+	return key
 }
 
 func (ctx *cbContext) Topic() Stream {
@@ -279,21 +307,22 @@ func (ctx *cbContext) Join(topic Table) interface{} {
 	if !ok {
 		ctx.Fail(fmt.Errorf("table %s not subscribed", topic))
 	}
-	data, err := v.st.Get(ctx.Key())
+
+	data, err := v.st.Get(ctx.msg.Key)
 	if err != nil {
-		ctx.Fail(fmt.Errorf("error getting key %s of table %s: %v", ctx.Key(), topic, err))
+		ctx.Fail(fmt.Errorf("error getting key %v of table %s: %v", ctx.msg.Key, topic, err))
 	} else if data == nil {
 		return nil
 	}
 
-	value, err := ctx.graph.codec(string(topic)).Decode(data)
+	value, err := ctx.graph.valueCodec(string(topic)).Decode(data)
 	if err != nil {
-		ctx.Fail(fmt.Errorf("error decoding value key %s of table %s: %v", ctx.Key(), topic, err))
+		ctx.Fail(fmt.Errorf("error decoding value key %v of table %s: %v", ctx.msg.Key, topic, err))
 	}
 	return value
 }
 
-func (ctx *cbContext) Lookup(topic Table, key string) interface{} {
+func (ctx *cbContext) Lookup(topic Table, key interface{}) interface{} {
 	if ctx.views == nil {
 		ctx.Fail(fmt.Errorf("topic %s not subscribed", topic))
 	}
@@ -309,7 +338,7 @@ func (ctx *cbContext) Lookup(topic Table, key string) interface{} {
 }
 
 // valueForKey returns the value of key in the processor state.
-func (ctx *cbContext) valueForKey(key string) (interface{}, error) {
+func (ctx *cbContext) valueForKey(key []byte) (interface{}, error) {
 	if ctx.table == nil {
 		return nil, fmt.Errorf("Cannot access state in stateless processor")
 	}
@@ -321,14 +350,14 @@ func (ctx *cbContext) valueForKey(key string) (interface{}, error) {
 		return nil, nil
 	}
 
-	value, err := ctx.graph.GroupTable().Codec().Decode(data)
+	value, err := ctx.graph.GroupTable().ValueCodec().Decode(data)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding value: %v", err)
 	}
 	return value, nil
 }
 
-func (ctx *cbContext) deleteKey(key string) error {
+func (ctx *cbContext) deleteKey(key []byte) error {
 	if ctx.graph.GroupTable() == nil {
 		return fmt.Errorf("Cannot access state in stateless processor")
 	}
@@ -347,7 +376,7 @@ func (ctx *cbContext) deleteKey(key string) error {
 }
 
 // setValueForKey sets a value for a key in the processor state.
-func (ctx *cbContext) setValueForKey(key string, value interface{}) error {
+func (ctx *cbContext) setValueForKey(key []byte, value interface{}) error {
 	if ctx.graph.GroupTable() == nil {
 		return fmt.Errorf("Cannot access state in stateless processor")
 	}
@@ -356,7 +385,7 @@ func (ctx *cbContext) setValueForKey(key string, value interface{}) error {
 		return fmt.Errorf("cannot set nil as value")
 	}
 
-	encodedValue, err := ctx.graph.GroupTable().Codec().Encode(value)
+	encodedValue, err := ctx.graph.GroupTable().ValueCodec().Encode(value)
 	if err != nil {
 		return fmt.Errorf("error encoding value: %v", err)
 	}

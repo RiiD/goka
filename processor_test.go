@@ -39,18 +39,18 @@ func createTestConsumerBuilder(t *testing.T) (SaramaConsumerBuilder, *MockAutoCo
 
 func expectCGEmit(bm *builderMock, table string, msgs []*sarama.ConsumerMessage) {
 	for _, msg := range msgs {
-		bm.producer.EXPECT().Emit(table, string(msg.Key), msg.Value).Return(NewPromise().Finish(nil, nil))
+		bm.producer.EXPECT().Emit(table, msg.Key, msg.Value).Return(NewPromise().Finish(nil, nil))
 	}
 }
 
 func expectCGLoop(bm *builderMock, loop string, msgs []*sarama.ConsumerMessage) {
 	bm.tmgr.EXPECT().EnsureStreamExists(loop, 1).AnyTimes()
 	for _, msg := range msgs {
-		bm.producer.EXPECT().Emit(loop, string(msg.Key), gomock.Any()).Return(NewPromise().Finish(nil, nil))
+		bm.producer.EXPECT().Emit(loop, msg.Key, gomock.Any()).Return(NewPromise().Finish(nil, nil))
 	}
 }
 
-func expectCGConsume(bm *builderMock, table string, msgs []*sarama.ConsumerMessage) {
+func expectCGConsume(bm *builderMock, table string, _ []*sarama.ConsumerMessage) {
 	var (
 		current int64
 	)

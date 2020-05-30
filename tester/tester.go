@@ -41,7 +41,8 @@ type Tester struct {
 	mClients sync.RWMutex
 	clients  map[string]*client
 
-	codecs      map[string]goka.Codec
+	valueCodecs map[string]goka.Codec
+	keyCodecs   map[string]goka.Codec
 	mQueues     sync.Mutex
 	topicQueues map[string]*queue
 
@@ -57,7 +58,8 @@ func New(t T) *Tester {
 
 		clients: make(map[string]*client),
 
-		codecs:      make(map[string]goka.Codec),
+		valueCodecs: make(map[string]goka.Codec),
+		keyCodecs:   make(map[string]goka.Codec),
 		topicQueues: make(map[string]*queue),
 		storages:    make(map[string]storage.Storage),
 	}
@@ -128,13 +130,13 @@ func (tt *Tester) EmitterProducerBuilder() goka.ProducerBuilder {
 // handleEmit handles an Emit-call on the producerMock.
 // This takes care of queueing calls
 // to handled topics or putting the emitted messages in the emitted-messages-list
-func (tt *Tester) handleEmit(topic string, key string, value []byte) *goka.Promise {
+func (tt *Tester) handleEmit(topic string, key []byte, value []byte) *goka.Promise {
 	promise := goka.NewPromise()
 	offset := tt.pushMessage(topic, key, value)
 	return promise.Finish(&sarama.ProducerMessage{Offset: offset}, nil)
 }
 
-func (tt *Tester) pushMessage(topic string, key string, data []byte) int64 {
+func (tt *Tester) pushMessage(topic string, key []byte, data []byte) int64 {
 	return tt.getOrCreateQueue(topic).push(key, data)
 }
 
@@ -163,43 +165,49 @@ func (tt *Tester) RegisterGroupGraph(gg *goka.GroupGraph) string {
 
 	// register codecs
 	if gg.GroupTable() != nil {
-		tt.registerCodec(gg.GroupTable().Topic(), gg.GroupTable().Codec())
+		tt.registerValueCodec(gg.GroupTable().Topic(), gg.GroupTable().ValueCodec())
+		tt.registerKeyCodec(gg.GroupTable().Topic(), gg.GroupTable().KeyCodec())
 	}
 
 	for _, input := range gg.InputStreams() {
-		tt.registerCodec(input.Topic(), input.Codec())
+		tt.registerValueCodec(input.Topic(), input.ValueCodec())
+		tt.registerKeyCodec(input.Topic(), input.KeyCodec())
 	}
 
 	for _, output := range gg.OutputStreams() {
-		tt.registerCodec(output.Topic(), output.Codec())
+		tt.registerValueCodec(output.Topic(), output.ValueCodec())
+		tt.registerKeyCodec(output.Topic(), output.KeyCodec())
 	}
 
 	for _, join := range gg.JointTables() {
-		tt.registerCodec(join.Topic(), join.Codec())
+		tt.registerValueCodec(join.Topic(), join.ValueCodec())
+		tt.registerKeyCodec(join.Topic(), join.KeyCodec())
 	}
 
 	if loop := gg.LoopStream(); loop != nil {
-		tt.registerCodec(loop.Topic(), loop.Codec())
+		tt.registerKeyCodec(loop.Topic(), loop.KeyCodec())
 	}
 
 	for _, lookup := range gg.LookupTables() {
-		tt.registerCodec(lookup.Topic(), lookup.Codec())
+		tt.registerKeyCodec(lookup.Topic(), lookup.KeyCodec())
 	}
 
 	return client.clientID
 }
 
 // RegisterView registers a new view to the tester
-func (tt *Tester) RegisterView(table goka.Table, c goka.Codec) string {
-	tt.registerCodec(string(table), c)
+func (tt *Tester) RegisterView(table goka.Table, keyCodec goka.Codec, valueCodec goka.Codec) string {
+	tt.registerKeyCodec(string(table), keyCodec)
+	tt.registerValueCodec(string(table), valueCodec)
 	client := tt.nextClient()
 	client.requireConsumer(string(table))
 	return client.clientID
 }
 
 // RegisterEmitter registers an emitter to be working with the tester.
-func (tt *Tester) RegisterEmitter(topic goka.Stream, codec goka.Codec) {
-	tt.registerCodec(string(topic), codec)
+func (tt *Tester) RegisterEmitter(topic goka.Stream, keyCodec goka.Codec, valueCodec goka.Codec) {
+	tt.registerKeyCodec(string(topic), keyCodec)
+	tt.registerValueCodec(string(topic), valueCodec)
 }
 
 func (tt *Tester) getOrCreateQueue(topic string) *queue {
@@ -213,45 +221,69 @@ func (tt *Tester) getOrCreateQueue(topic string) *queue {
 	return queue
 }
 
-func (tt *Tester) codecForTopic(topic string) goka.Codec {
-	codec, exists := tt.codecs[topic]
+func (tt *Tester) valueCodecForTopic(topic string) goka.Codec {
+	codec, exists := tt.valueCodecs[topic]
 	if !exists {
-		panic(fmt.Errorf("no codec for topic %s registered", topic))
+		panic(fmt.Errorf("no value codec for topic %s registered", topic))
 	}
 	return codec
 }
 
-func (tt *Tester) registerCodec(topic string, codec goka.Codec) {
+func (tt *Tester) keyCodecForTopic(topic string) goka.Codec {
+	codec, exists := tt.keyCodecs[topic]
+	if !exists {
+		panic(fmt.Errorf("no key codec for topic %s registered", topic))
+	}
+	return codec
+}
+
+func (tt *Tester) registerValueCodec(topic string, codec goka.Codec) {
 	// create a queue, we're going to need it anyway
 	tt.getOrCreateQueue(topic)
 
-	if existingCodec, exists := tt.codecs[topic]; exists {
+	if existingCodec, exists := tt.valueCodecs[topic]; exists {
 		if reflect.TypeOf(codec) != reflect.TypeOf(existingCodec) {
-			panic(fmt.Errorf("There are different codecs for the same topic. This is messed up (%#v, %#v)", codec, existingCodec))
+			panic(fmt.Errorf("There are different value codecs for the same topic. This is messed up (%#v, %#v)", codec, existingCodec))
 		}
 	}
-	tt.codecs[topic] = codec
+	tt.valueCodecs[topic] = codec
+}
+
+func (tt *Tester) registerKeyCodec(topic string, codec goka.Codec) {
+	// create a queue, we're going to need it anyway
+	tt.getOrCreateQueue(topic)
+
+	if existingCodec, exists := tt.keyCodecs[topic]; exists {
+		if reflect.TypeOf(codec) != reflect.TypeOf(existingCodec) {
+			panic(fmt.Errorf("There are different key codecs for the same topic. This is messed up (%#v, %#v)", codec, existingCodec))
+		}
+	}
+	tt.keyCodecs[topic] = codec
 }
 
 // TableValue attempts to get a value from any table that is used in the tester
-func (tt *Tester) TableValue(table goka.Table, key string) interface{} {
+func (tt *Tester) TableValue(table goka.Table, key interface{}) interface{} {
 	tt.waitStartup()
 
 	topic := string(table)
+	keyBytes, err := tt.keyCodecForTopic(topic).Encode(key)
+	if err != nil {
+		panic(fmt.Errorf("error encoding key %v: %v", key, err))
+	}
 	tt.mStorages.Lock()
 	st, exists := tt.storages[topic]
 	tt.mStorages.Unlock()
 	if !exists {
 		panic(fmt.Errorf("topic %s does not exist", topic))
 	}
-	item, err := st.Get(key)
+	item, err := st.Get(keyBytes)
 	if err != nil {
-		tt.t.Fatalf("Error getting table value from storage (table=%s, key=%s): %v", table, key, err)
+		tt.t.Fatalf("Error getting table value from storage (table=%s, key=%v): %v", table, key, err)
 	}
 	if item == nil {
 		return nil
 	}
-	value, err := tt.codecForTopic(topic).Decode(item)
+	value, err := tt.valueCodecForTopic(topic).Decode(item)
 	if err != nil {
 		tt.t.Fatalf("error decoding value from storage (table=%s, key=%s, value=%v): %v", table, key, item, err)
 	}
@@ -261,22 +293,28 @@ func (tt *Tester) TableValue(table goka.Table, key string) interface{} {
 // SetTableValue sets a value in a processor's or view's table direcly via storage
 // This method blocks until all expected clients are running, so make sure
 // to call it *after* you have started all processors/views, otherwise it'll deadlock.
-func (tt *Tester) SetTableValue(table goka.Table, key string, value interface{}) {
+func (tt *Tester) SetTableValue(table goka.Table, key, value interface{}) {
 	tt.waitStartup()
 
 	topic := string(table)
+
+	keyBytes, err := tt.keyCodecForTopic(topic).Encode(key)
+	if err != nil {
+		panic(fmt.Errorf("error encoding key %v: %v", key, err))
+	}
+
 	st, err := tt.getOrCreateStorage(topic)
 	if err != nil {
 		panic(fmt.Errorf("error creating storage for topic %s: %v", topic, err))
 	}
-	data, err := tt.codecForTopic(topic).Encode(value)
+	data, err := tt.valueCodecForTopic(topic).Encode(value)
 	if err != nil {
 		tt.t.Fatalf("error decoding value from storage (table=%s, key=%s, value=%v): %v", table, key, value, err)
 	}
 
-	err = st.Set(key, data)
+	err = st.Set(keyBytes, data)
 	if err != nil {
-		panic(fmt.Errorf("Error setting key %s in storage %s: %v", key, table, err))
+		panic(fmt.Errorf("Error setting key %v in storage %s: %v", key, table, err))
 	}
 }
 func (tt *Tester) getOrCreateStorage(table string) (storage.Storage, error) {
@@ -306,7 +344,7 @@ func (tt *Tester) ClearValues() {
 		logger.Printf("clearing all values from storage for topic %s", topic)
 		it, _ := st.Iterator()
 		for it.Next() {
-			st.Delete(string(it.Key()))
+			st.Delete(it.Key())
 		}
 	}
 
@@ -347,18 +385,22 @@ func (tt *Tester) waitForClients() {
 
 // Consume pushes a message for topic/key to be consumed by all processors/views
 // whoever is using it being registered to the Tester
-func (tt *Tester) Consume(topic string, key string, msg interface{}) {
+func (tt *Tester) Consume(topic string, key interface{}, msg interface{}) {
 	tt.waitStartup()
 
+	keyBytes, err := tt.keyCodecForTopic(topic).Encode(key)
+	if err != nil {
+		panic(fmt.Errorf("error encoding key %v: %v", key, err))
+	}
 	value := reflect.ValueOf(msg)
 	if msg == nil || (value.Kind() == reflect.Ptr && value.IsNil()) {
-		tt.pushMessage(topic, key, nil)
+		tt.pushMessage(topic, keyBytes, nil)
 	} else {
-		data, err := tt.codecForTopic(topic).Encode(msg)
+		data, err := tt.valueCodecForTopic(topic).Encode(msg)
 		if err != nil {
 			panic(fmt.Errorf("Error encoding value %v: %v", msg, err))
 		}
-		tt.pushMessage(topic, key, data)
+		tt.pushMessage(topic, keyBytes, data)
 	}
 
 	tt.waitForClients()

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/facebookgo/ensure"
 	"github.com/golang/mock/gomock"
 
 	"github.com/lovoo/goka/codec"
@@ -18,7 +19,7 @@ import (
 )
 
 func newEmitter(err error, done func(err error)) emitter {
-	return func(topic string, key string, value []byte) *Promise {
+	return func(topic string, key, value []byte) *Promise {
 		p := NewPromise()
 		if done != nil {
 			p.Then(done)
@@ -28,7 +29,7 @@ func newEmitter(err error, done func(err error)) emitter {
 }
 
 func newEmitterW(wg *sync.WaitGroup, err error, done func(err error)) emitter {
-	return func(topic string, key string, value []byte) *Promise {
+	return func(topic string, key, value []byte) *Promise {
 		wg.Add(1)
 		p := NewPromise()
 		if done != nil {
@@ -59,7 +60,7 @@ func TestContext_Emit(t *testing.T) {
 	})
 
 	ctx.start()
-	ctx.emit("emit-topic", "key", []byte("value"))
+	ctx.emit("emit-topic", []byte("key"), []byte("value"))
 	ctx.finish(nil)
 
 	// we can now for all callbacks -- it should also guarantee a memory fence
@@ -84,11 +85,17 @@ func TestContext_Timestamp(t *testing.T) {
 }
 
 func TestContext_EmitError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var (
 		ack             = 0
 		emitted         = 0
 		errToEmit       = errors.New("some error")
 		group     Group = "some-group"
+		topic           = "topic"
+		key             = []byte("key")
+		value           = []byte("value")
 	)
 
 	failer := func(err error) {
@@ -97,7 +104,10 @@ func TestContext_EmitError(t *testing.T) {
 
 	// test error case
 	ctx := &cbContext{
-		graph:            DefineGroup(group, Persist(new(codec.String))),
+		graph: DefineGroup(
+			group,
+			Persist(new(codec.String)),
+			Output("topic", new(codec.String))),
 		wg:               &sync.WaitGroup{},
 		trackOutputStats: func(ctx context.Context, topic string, size int) {},
 		syncFailer:       failer,
@@ -109,8 +119,17 @@ func TestContext_EmitError(t *testing.T) {
 		test.AssertEqual(t, err, errToEmit)
 	})
 
+	keyCodec := NewMockCodec(ctrl)
+	valueCodec := NewMockCodec(ctrl)
+
+	ctx.graph.valueCodecs[topic] = valueCodec
+	ctx.graph.keyCodecs[topic] = keyCodec
+
+	keyCodec.EXPECT().Encode(key).Return(key, nil)
+	valueCodec.EXPECT().Encode(value).Return(value, nil)
+
 	ctx.start()
-	ctx.emit("emit-topic", "key", []byte("value"))
+	ctx.Emit(Stream(topic), key, value)
 	ctx.finish(nil)
 
 	// we can now for all callbacks -- it should also guarantee a memory fence
@@ -148,6 +167,34 @@ func TestContext_EmitToStateTopic(t *testing.T) {
 	}()
 }
 
+func TestContext_EmitEncodeError(t *testing.T) {
+	topic := "topic-with-key-codec"
+	ctx := &cbContext{
+		graph: DefineGroup("group", Persist(c), Output(Stream(topic), c)),
+		syncFailer: func(err error) {
+			panic(err)
+		},
+	}
+
+	func() {
+		defer func() {
+			err := recover()
+			actual := err.(error)
+			test.AssertTrue(t, errors.Is(actual, codec.ErrInvalidType))
+		}()
+		ctx.Emit(Stream(topic), 123, "value")
+	}()
+
+	func() {
+		defer func() {
+			err := recover()
+			actual := err.(error)
+			test.AssertTrue(t, errors.Is(actual, codec.ErrInvalidType))
+		}()
+		ctx.Emit(Stream(topic), "key", []byte("value"))
+	}()
+}
+
 func TestContext_GetSetStateless(t *testing.T) {
 	// ctx stateless since no storage passed
 	ctx := &cbContext{
@@ -171,7 +218,7 @@ func TestContext_Delete(t *testing.T) {
 
 	var (
 		offset       = int64(123)
-		key          = "key"
+		key          = []byte("key")
 		ack          = 0
 		group  Group = "some-group"
 		st           = NewMockStorage(ctrl)
@@ -215,7 +262,7 @@ func TestContext_DeleteStateless(t *testing.T) {
 
 	var (
 		offset       = int64(123)
-		key          = "key"
+		key          = []byte("key")
 		group  Group = "some-group"
 	)
 
@@ -236,7 +283,7 @@ func TestContext_DeleteStorageError(t *testing.T) {
 
 	var (
 		offset       = int64(123)
-		key          = "key"
+		key          = []byte("key")
 		group  Group = "some-group"
 		st           = NewMockStorage(ctrl)
 		pt           = &PartitionTable{
@@ -270,7 +317,7 @@ func TestContext_Set(t *testing.T) {
 	var (
 		offset       = int64(123)
 		ack          = 0
-		key          = "key"
+		key          = []byte("key")
 		value        = "value"
 		group  Group = "some-group"
 		st           = NewMockStorage(ctrl)
@@ -289,7 +336,7 @@ func TestContext_Set(t *testing.T) {
 		wg:               new(sync.WaitGroup),
 		commit:           func() { ack++ },
 		trackOutputStats: func(ctx context.Context, topic string, size int) {},
-		msg:              &sarama.ConsumerMessage{Key: []byte(key), Offset: offset},
+		msg:              &sarama.ConsumerMessage{Key: key, Offset: offset},
 		table:            pt,
 		ctx:              context.Background(),
 	}
@@ -317,7 +364,7 @@ func TestContext_GetSetStateful(t *testing.T) {
 
 	var (
 		group  Group = "some-group"
-		key          = "key"
+		key          = []byte("key")
 		value        = "value"
 		offset       = int64(123)
 		wg           = new(sync.WaitGroup)
@@ -342,11 +389,11 @@ func TestContext_GetSetStateful(t *testing.T) {
 		wg:               wg,
 		graph:            graph,
 		trackOutputStats: func(ctx context.Context, topic string, size int) {},
-		msg:              &sarama.ConsumerMessage{Key: []byte(key), Offset: offset},
-		emitter: func(tp string, k string, v []byte) *Promise {
+		msg:              &sarama.ConsumerMessage{Key: key, Offset: offset},
+		emitter: func(tp string, k, v []byte) *Promise {
 			wg.Add(1)
 			test.AssertEqual(t, tp, graph.GroupTable().Topic())
-			test.AssertEqual(t, string(k), key)
+			test.AssertEqual(t, k, key)
 			test.AssertEqual(t, string(v), value)
 			return NewPromise().Finish(nil, nil)
 		},
@@ -368,7 +415,7 @@ func TestContext_SetErrors(t *testing.T) {
 
 	var (
 		group  Group = "some-group"
-		key          = "key"
+		key          = []byte("key")
 		value        = "value"
 		offset int64 = 123
 		wg           = new(sync.WaitGroup)
@@ -390,7 +437,7 @@ func TestContext_SetErrors(t *testing.T) {
 		trackOutputStats: func(ctx context.Context, topic string, size int) {},
 		wg:               wg,
 		graph:            DefineGroup(group, Persist(new(codec.String))),
-		msg:              &sarama.ConsumerMessage{Key: []byte(key), Offset: offset},
+		msg:              &sarama.ConsumerMessage{Key: key, Offset: offset},
 		syncFailer:       failer,
 		asyncFailer:      failer,
 	}
@@ -432,23 +479,80 @@ func TestContext_LoopbackNoLoop(t *testing.T) {
 	}()
 }
 
-func TestContext_Loopback(t *testing.T) {
-
+func TestContext_LoopbackValueEncodeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	valueCodec := NewMockCodec(ctrl)
+
+	valueEncodeError := errors.New("value encode error")
+
+	valueCodec.EXPECT().Encode(gomock.Any()).Return(nil, valueEncodeError)
+
+	graph := DefineGroup(
+		"group",
+		Persist(c),
+		Loop(valueCodec, cb))
+
+	ctx := &cbContext{
+		graph: graph,
+		syncFailer: func(err error) {
+			panic(err)
+		},
+	}
+
+	func() {
+		defer func() {
+			rec := recover()
+			err := rec.(error)
+			test.AssertTrue(t, errors.Is(err, valueEncodeError))
+		}()
+		ctx.Loopback("some-key", "whatever")
+	}()
+}
+
+func TestContext_LoopbackKeyEncodeError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	keyCodec := NewMockCodec(ctrl)
+
+	keyEncodeError := errors.New("key encode error")
+
+	keyCodec.EXPECT().Encode(gomock.Any()).Return(nil, keyEncodeError)
+
+	graph := DefineGroup("group", Persist(c), LoopWithCustomKeyCodec(keyCodec, new(codec.String), cb))
+
+	ctx := &cbContext{
+		graph: graph,
+		syncFailer: func(err error) {
+			panic(err)
+		},
+	}
+
+	func() {
+		defer func() {
+			rec := recover()
+			err := rec.(error)
+			test.AssertTrue(t, errors.Is(err, keyEncodeError))
+		}()
+		ctx.Loopback("some-key", "whatever")
+	}()
+}
+
+func TestContext_Loopback(t *testing.T) {
 	var (
 		key   = "key"
 		value = "value"
 		cnt   = 0
 	)
 
-	graph := DefineGroup("group", Persist(c), Loop(c, cb))
+	graph := DefineGroup("group", Persist(c), LoopWithCustomKeyCodec(c, c, cb))
 	ctx := &cbContext{
 		graph:            graph,
 		msg:              &sarama.ConsumerMessage{},
 		trackOutputStats: func(ctx context.Context, topic string, size int) {},
-		emitter: func(tp string, k string, v []byte) *Promise {
+		emitter: func(tp string, k []byte, v []byte) *Promise {
 			cnt++
 			test.AssertEqual(t, tp, graph.LoopStream().Topic())
 			test.AssertEqual(t, string(k), key)
@@ -466,7 +570,7 @@ func TestContext_Join(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
-		key           = "key"
+		key           = []byte("key")
 		value         = "value"
 		table   Table = "table"
 		errSome       = errors.New("some-error")
@@ -475,7 +579,7 @@ func TestContext_Join(t *testing.T) {
 
 	ctx := &cbContext{
 		graph: DefineGroup("group", Persist(c), Loop(c, cb), Join(table, c)),
-		msg:   &sarama.ConsumerMessage{Key: []byte(key)},
+		msg:   &sarama.ConsumerMessage{Key: key},
 		pviews: map[string]*PartitionTable{
 			string(table): &PartitionTable{
 				log: logger.Default(),
@@ -528,8 +632,9 @@ func TestContext_Lookup(t *testing.T) {
 		views: map[string]*View{
 			string(table): &View{
 				opts: &voptions{
-					tableCodec: c,
-					hasher:     DefaultHasher(),
+					tableValueCodec: c,
+					tableKeyCodec:   c,
+					hasher:          DefaultHasher(),
 				},
 				partitions: []*PartitionTable{
 					&PartitionTable{
@@ -545,13 +650,13 @@ func TestContext_Lookup(t *testing.T) {
 		syncFailer: func(err error) { panic(err) },
 	}
 
-	st.EXPECT().Get(key).Return([]byte(value), nil)
+	st.EXPECT().Get([]byte(key)).Return([]byte(value), nil)
 	v := ctx.Lookup(table, key)
 	test.AssertEqual(t, v, value)
 
 	func() {
 		defer test.PanicAssertStringContains(t, errSome.Error())
-		st.EXPECT().Get(key).Return(nil, errSome)
+		st.EXPECT().Get([]byte(key)).Return(nil, errSome)
 		_ = ctx.Lookup(table, key)
 	}()
 
@@ -606,4 +711,58 @@ func TestContext_Fail(t *testing.T) {
 
 	// this must not be executed. ctx.Fail should stop execution
 	test.AssertTrue(t, false)
+}
+
+func TestContext_Key(t *testing.T) {
+	key := []byte("key")
+	decodedKey := "key"
+	topic := "topic"
+
+	ctx := cbContext{
+		graph: DefineGroup("group"),
+		msg: &sarama.ConsumerMessage{
+			Key:   []byte(key),
+			Topic: topic,
+		},
+		syncFailer: func(err error) {
+			panic(err)
+		},
+	}
+
+	t.Run("no codec error", func(t *testing.T) {
+		defer test.PanicAssertStringContains(t, "no key codec for topic topic")
+		ctx.Key()
+	})
+
+	t.Run("decode error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		decodeError := errors.New("decode error")
+
+		keyCodec := NewMockCodec(ctrl)
+		keyCodec.EXPECT().Decode(gomock.Any()).Return(nil, decodeError)
+		ctx.graph.keyCodecs[topic] = keyCodec
+
+		defer func() {
+			rec := recover()
+			err := rec.(error)
+
+			test.AssertTrue(t, errors.Is(err, decodeError))
+		}()
+		ctx.Key()
+	})
+
+	t.Run("decode error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		keyCodec := NewMockCodec(ctrl)
+		keyCodec.EXPECT().Decode(key).Return(decodedKey, nil).Times(1)
+
+		ctx.graph.keyCodecs[topic] = keyCodec
+
+		actual := ctx.Key()
+		ensure.DeepEqual(t, actual, decodedKey)
+	})
 }

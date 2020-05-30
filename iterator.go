@@ -1,6 +1,8 @@
 package goka
 
 import (
+	"errors"
+
 	"github.com/lovoo/goka/storage"
 )
 
@@ -13,7 +15,7 @@ type Iterator interface {
 	// Err returns the error that stopped the iteration if any.
 	Err() error
 	// Return the key of the current item
-	Key() string
+	Key() (interface{}, error)
 	// Return the value of the current item
 	// This value is already decoded with the view's codec (or nil, if it's nil)
 	Value() (interface{}, error)
@@ -23,12 +25,13 @@ type Iterator interface {
 	// is greater or equal to the given key. It returns whether at least one of
 	// such key-value pairs exist. Next must be called after seeking to access
 	// the first pair.
-	Seek(key string) bool
+	Seek(key interface{}) (bool, error)
 }
 
 type iterator struct {
-	iter  storage.Iterator
-	codec Codec
+	iter       storage.Iterator
+	valueCodec Codec
+	keyCodec   Codec
 }
 
 // Next advances the iterator to the next key.
@@ -37,8 +40,12 @@ func (i *iterator) Next() bool {
 }
 
 // Key returns the current key.
-func (i *iterator) Key() string {
-	return string(i.iter.Key())
+func (i *iterator) Key() (interface{}, error) {
+	keyBytes := i.iter.Key()
+	if keyBytes == nil {
+		return nil, errors.New("nil key")
+	}
+	return i.valueCodec.Decode(keyBytes)
 }
 
 // Value returns the current value decoded by the codec of the storage.
@@ -49,7 +56,7 @@ func (i *iterator) Value() (interface{}, error) {
 	} else if data == nil {
 		return nil, nil
 	}
-	return i.codec.Decode(data)
+	return i.valueCodec.Decode(data)
 }
 
 // Err returns the possible iteration error.
@@ -62,6 +69,10 @@ func (i *iterator) Release() {
 	i.iter.Release()
 }
 
-func (i *iterator) Seek(key string) bool {
-	return i.iter.Seek([]byte(key))
+func (i *iterator) Seek(key interface{}) (bool, error) {
+	keyBytes, err := i.keyCodec.Encode(key)
+	if err != nil {
+		return false, err
+	}
+	return i.iter.Seek(keyBytes), nil
 }

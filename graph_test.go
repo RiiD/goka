@@ -84,7 +84,7 @@ func TestGroupGraph_codec(t *testing.T) {
 	)
 
 	for _, topic := range []string{"input-topic", "input-topic2", "input-topic3"} {
-		codec := g.codec(topic)
+		codec := g.valueCodec(topic)
 		test.AssertEqual(t, codec, c)
 	}
 

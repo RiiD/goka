@@ -488,7 +488,7 @@ func (p *PartitionTable) loadMessages(ctx context.Context, cons sarama.Partition
 			}
 
 			lastMessage = time.Now()
-			if err := p.storeEvent(string(msg.Key), msg.Value, msg.Offset); err != nil {
+			if err := p.storeEvent(msg.Key, msg.Value, msg.Offset); err != nil {
 				errs.Collect(fmt.Errorf("load: error updating storage: %v", err))
 				return
 			}
@@ -600,7 +600,7 @@ func (p *PartitionTable) updateHwmStats() {
 	}
 }
 
-func (p *PartitionTable) storeEvent(key string, value []byte, offset int64) error {
+func (p *PartitionTable) storeEvent(key []byte, value []byte, offset int64) error {
 	err := p.st.Update(key, value)
 	if err != nil {
 		return fmt.Errorf("Error from the update callback while recovering from the log: %v", err)
@@ -623,7 +623,7 @@ func (p *PartitionTable) WaitRecovered() chan struct{} {
 }
 
 // Get returns the value for passed key
-func (p *PartitionTable) Get(key string) ([]byte, error) {
+func (p *PartitionTable) Get(key []byte) ([]byte, error) {
 	if !p.state.IsState(State(PartitionRunning)) {
 		return nil, fmt.Errorf("Partition is not running so it's not safe to read values")
 	}
@@ -631,7 +631,7 @@ func (p *PartitionTable) Get(key string) ([]byte, error) {
 }
 
 // Has returns whether the storage contains passed key
-func (p *PartitionTable) Has(key string) (bool, error) {
+func (p *PartitionTable) Has(key []byte) (bool, error) {
 	if !p.state.IsState(State(PartitionRunning)) {
 		return false, fmt.Errorf("Partition is not running so it's not safe to read values")
 	}
@@ -639,12 +639,12 @@ func (p *PartitionTable) Has(key string) (bool, error) {
 }
 
 // Set sets a key value key in the partition table by modifying the underlying storage
-func (p *PartitionTable) Set(key string, value []byte) error {
+func (p *PartitionTable) Set(key []byte, value []byte) error {
 	return p.st.Set(key, value)
 }
 
 // Delete removes the passed key from the partition table by deleting from the underlying storage
-func (p *PartitionTable) Delete(key string) error {
+func (p *PartitionTable) Delete(key []byte) error {
 	return p.st.Delete(key)
 }
 

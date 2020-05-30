@@ -78,7 +78,7 @@ func Test_2InputOutput(t *testing.T) {
 	// make sure received the message in the output
 	key, value, valid := mt.Next()
 	test.AssertTrue(t, valid)
-	test.AssertEqual(t, key, "key")
+	test.AssertEqual(t, key, []byte("key"))
 	test.AssertEqual(t, value, "forwarded: some-message")
 }
 
@@ -190,7 +190,7 @@ func Test_Subtest(t *testing.T) {
 		// check it was emitted
 		key, value, ok := mt.Next()
 		test.AssertTrue(t, ok)
-		test.AssertEqual(t, key, "output-key")
+		test.AssertEqual(t, key, []byte("output-key"))
 		test.AssertEqual(t, value, "forwarded: hello")
 
 		// we should be at the end
